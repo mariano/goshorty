@@ -2,12 +2,26 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"html/template"
+	"net/http"
 )
 
 var templates = make(map[string]*template.Template)
 
-func LoadView(name string) *View {
+func RenderView(response http.ResponseWriter, view string, data interface{}) {
+	v := load(view)
+	v.Set(data)
+
+	body, error := v.Render()
+	if error != nil {
+		fmt.Println(error)
+		return
+	}
+	response.Write(body)
+}
+
+func load(name string) *View {
 	v := &View{name: name, layout: "layout"}
 	return v
 }
