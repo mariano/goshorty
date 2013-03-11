@@ -1,8 +1,13 @@
 A URL shortener written in Go.
 
+Lyrics by 50 Cent ;]
+
 > Go, shorty
+>
 > It's your birthday
+>
 > We gon' party like it's your birthday
+>
 > We gon' sip Bacardi like it's your birthday
 
 # Requirements #
