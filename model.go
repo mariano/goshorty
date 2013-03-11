@@ -1,8 +1,8 @@
 package main
 
 import(
+	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/garyburd/redigo/redis"
 )
 
@@ -13,8 +13,8 @@ const (
 )
 
 type Url struct {
-	id string
-	destination string
+	Id string
+	Destination string
 }
 
 func (this *Url) Save() error {
@@ -24,14 +24,33 @@ func (this *Url) Save() error {
 		return err
 	}
 
-	reply, err := c.Do("SET", REDIS_PREFIX + "url:" + this.id, this.id)
+	data, err := json.Marshal(this)
+	if err != nil {
+		return err
+	}
 
+	reply, err := c.Do("SET", REDIS_PREFIX + "url:" + this.Id, data)
 	if err == nil && reply != "OK" {
 		err = errors.New("Invalid Redis response")
 	}
 
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (this *Url) Delete() error {
+	c, err := redis.Dial("tcp", REDIS_HOST + ":" + REDIS_PORT)
+	defer c.Close()
+	if err != nil {
+		return err
+	}
+
+	reply, err := c.Do("DEL", REDIS_PREFIX + "url:" + this.Id)
+	if err == nil && reply != "OK" {
+		return errors.New("Invalid Redis response")
 	}
 
 	return nil
@@ -50,14 +69,16 @@ func GetUrl(id string) (*Url, error) {
 		return nil, nil
 	}
 
-	reply, err = redis.String(reply, err)
+	
+	data, err := redis.Bytes(reply, err)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("GET RESPONSE:")
-	fmt.Println(reply)
+	var url Url
+	if err := json.Unmarshal(data, &url); err != nil {
+		return nil, err
+	}
 
-	return &Url{id: id}, nil
+	return &url, nil
 }
-

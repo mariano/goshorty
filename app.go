@@ -18,7 +18,7 @@ func ViewHandler(response http.ResponseWriter, request *http.Request) {
 		io.WriteString(response, "NOT FOUND!")
 		return
 	}
-	io.WriteString(response, "Go to " + url.id)
+	io.WriteString(response, "Go to " + url.Id)
 }
 
 func StatsHandler(response http.ResponseWriter, request *http.Request) {
@@ -32,7 +32,7 @@ func StatsHandler(response http.ResponseWriter, request *http.Request) {
 		io.WriteString(response, "NOT FOUND!")
 		return
 	}
-	RenderView(response, "stats", map[string]string{ "id": url.id })
+	RenderView(response, "stats", map[string]string{ "id": url.Id })
 }
 
 func HomeHandler(response http.ResponseWriter, request *http.Request) {
@@ -41,12 +41,19 @@ func HomeHandler(response http.ResponseWriter, request *http.Request) {
 
 func main() {
 	/*
-	u := &Url{id: "test01"}
+	u := &Url{Id: "test01"}
 	err := u.Save()
 	if err != nil {
 		fmt.Println("ERROR: ")
 		fmt.Println(err)
 	}
+
+	u, err := GetUrl("test01")
+	if err != nil {
+		fmt.Println("ERROR: ")
+		fmt.Println(err)
+	}
+	u.Delete()
 	*/
 
 	router := mux.NewRouter()
