@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"github.com/gorilla/mux"
@@ -9,36 +8,34 @@ import (
 
 var router = mux.NewRouter()
 
-func ViewHandler(response http.ResponseWriter, request *http.Request) {
-	vars := mux.Vars(request)
+func ViewHandler(resp http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
 	url, err := GetUrl(vars["id"])
 	if err != nil {
-		io.WriteString(response, "ERROR")
-		fmt.Println(err)
+		RenderError(resp, err.Error(), http.StatusInternalServerError)
 		return
 	} else if url == nil {
-		io.WriteString(response, "NOT FOUND!")
+		RenderError(resp, "No URL was found with that goshorty code", http.StatusNotFound)
 		return
 	}
-	io.WriteString(response, "Go to " + url.Id)
+	io.WriteString(resp, "Go to " + url.Id)
 }
 
-func StatsHandler(response http.ResponseWriter, request *http.Request) {
-	vars := mux.Vars(request)
+func StatsHandler(resp http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
 	url, err := GetUrl(vars["id"])
 	if err != nil {
-		io.WriteString(response, "ERROR")
-		fmt.Println(err)
+		RenderError(resp, err.Error(), http.StatusInternalServerError)
 		return
 	} else if url == nil {
-		io.WriteString(response, "NOT FOUND!")
+		RenderError(resp, "No URL was found with that goshorty code", http.StatusNotFound)
 		return
 	}
-	RenderView(response, "stats", map[string]string{ "id": url.Id })
+	Render(resp, "stats", map[string]string{ "id": url.Id })
 }
 
-func HomeHandler(response http.ResponseWriter, request *http.Request) {
-	RenderView(response, "home", map[string]string{ "name": "Golang" })
+func HomeHandler(resp http.ResponseWriter, req *http.Request) {
+	Render(resp, "home", map[string]string{ "name": "Golang" })
 }
 
 func main() {

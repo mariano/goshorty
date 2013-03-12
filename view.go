@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"html/template"
 	"net/http"
 	"path/filepath"
@@ -10,16 +9,32 @@ import (
 
 var templates = make(map[string]*template.Template)
 
-func RenderView(response http.ResponseWriter, view string, data interface{}) {
+func Render(resp http.ResponseWriter, view string, data interface{}) (err error) {
 	v := &View{name: view, layout: "layout"}
 	v.Set(data)
 
-	body, error := v.Render()
-	if error != nil {
-		fmt.Println(error)
+	body, err := v.Render()
+	if err != nil {
+		http.Error(resp, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	response.Write(body)
+	resp.Write(body)
+	return
+}
+
+func RenderError(resp http.ResponseWriter, message string, code int) (err error) {
+	v := &View{name: "error", layout: "layout"}
+	v.Set(map[string]string{ "Error": message })
+
+	body, err := v.Render()
+	if err != nil {
+		http.Error(resp, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp.WriteHeader(code)
+	resp.Write(body)
+	return
 }
 
 type View struct {
@@ -37,26 +52,27 @@ func (this *View) Set(data interface{}) {
 	this.data = data
 }
 
-func (this *View) Render() (body []byte, error error) {
+func (this *View) Render() (body []byte, err error) {
 	return this.build("views/" + this.name + ".html", this.data)
 }
 
-func (this *View) build(file string, data interface{}) (body []byte, error error) {
-	view, error := this.parse(file, data)
-	if error != nil {
-		return nil, error
+func (this *View) build(file string, data interface{}) (body []byte, err error) {
+	view, err := this.parse(file, data)
+	if err != nil {
+		return
 	}
-	layout, error := this.parse("views/layouts/" + this.layout + ".html", content{View: this, Content: template.HTML(view)})
-	if error != nil {
-		return nil, error
+	body, err = this.parse("views/layouts/" + this.layout + ".html", content{View: this, Content: template.HTML(view)})
+	if err != nil {
+		return
 	}
-	return layout, nil
+	return
 }
 
-func (this *View) parse(file string, data interface{}) (body []byte, error error) {
+func (this *View) parse(file string, data interface{}) (body []byte, err error) {
 	var buf bytes.Buffer
-	if templates[file] == nil {
-		t := template.New(filepath.Base(file))
+	t, present := templates[file]
+	if !present {
+		t = template.New(filepath.Base(file))
 		t.Funcs(template.FuncMap{
 			"url": func(name string, args ...string)(string) {
 				route := router.Get(name)
@@ -72,16 +88,16 @@ func (this *View) parse(file string, data interface{}) (body []byte, error error
 			},
 		})
 
-		_, err := t.ParseFiles(file)
+		_, err = t.ParseFiles(file)
 		if err != nil {
-			return nil, err
+			return
 		}
 		templates[file] = t
 	}
 
-	err := templates[file].Execute(&buf, data)
+	err = t.Execute(&buf, data)
 	if err != nil {
-		return nil, err
+		return
 	}
 	return buf.Bytes(), nil
 }
