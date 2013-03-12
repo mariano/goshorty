@@ -5,15 +5,24 @@ import (
 	"html/template"
 	"net/http"
 	"path/filepath"
+	"sync"
 )
 
-var templates = make(map[string]*template.Template)
+type registry struct {
+	sync.RWMutex
+	templates map[string]*template.Template
+}
+
+var r registry
+
+func init() {
+	r.RLock()
+	r.templates = make(map[string]*template.Template)
+	r.RUnlock()
+}
 
 func Render(resp http.ResponseWriter, view string, data interface{}) (err error) {
-	v := &View{name: view, layout: "layout"}
-	v.Set(data)
-
-	body, err := v.Render()
+	body, err := render("layout", view, data)
 	if err != nil {
 		http.Error(resp, err.Error(), http.StatusInternalServerError)
 		return
@@ -23,10 +32,7 @@ func Render(resp http.ResponseWriter, view string, data interface{}) (err error)
 }
 
 func RenderError(resp http.ResponseWriter, message string, code int) (err error) {
-	v := &View{name: "error", layout: "layout"}
-	v.Set(map[string]string{ "Error": message })
-
-	body, err := v.Render()
+	body, err := render("layout", "error", map[string]string{ "Error": message })
 	if err != nil {
 		http.Error(resp, err.Error(), http.StatusInternalServerError)
 		return
@@ -37,40 +43,23 @@ func RenderError(resp http.ResponseWriter, message string, code int) (err error)
 	return
 }
 
-type View struct {
-	name string
-	layout string
-	data interface{}
-}
-
-type content struct {
-	View *View
-	Content template.HTML
-}
-
-func (this *View) Set(data interface{}) {
-	this.data = data
-}
-
-func (this *View) Render() (body []byte, err error) {
-	return this.build("views/" + this.name + ".html", this.data)
-}
-
-func (this *View) build(file string, data interface{}) (body []byte, err error) {
-	view, err := this.parse(file, data)
+func render(layout string, name string, data interface{}) (body []byte, err error) {
+	view, err := parse("views/" + name + ".html", data)
 	if err != nil {
 		return
 	}
-	body, err = this.parse("views/layouts/" + this.layout + ".html", content{View: this, Content: template.HTML(view)})
+	body, err = parse("views/layouts/" + layout + ".html", map[string]template.HTML{"Content": template.HTML(view)})
 	if err != nil {
 		return
 	}
 	return
 }
 
-func (this *View) parse(file string, data interface{}) (body []byte, err error) {
-	var buf bytes.Buffer
-	t, present := templates[file]
+func parse(file string, data interface{}) (body []byte, err error) {
+	r.RLock()
+	t, present := r.templates[file]
+	r.RUnlock()
+
 	if !present {
 		t = template.New(filepath.Base(file))
 		t.Funcs(template.FuncMap{
@@ -92,9 +81,12 @@ func (this *View) parse(file string, data interface{}) (body []byte, err error) 
 		if err != nil {
 			return
 		}
-		templates[file] = t
+		r.Lock()
+		r.templates[file] = t
+		r.Unlock()
 	}
 
+	var buf bytes.Buffer
 	err = t.Execute(&buf, data)
 	if err != nil {
 		return
