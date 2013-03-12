@@ -16,9 +16,7 @@ type registry struct {
 var r registry
 
 func init() {
-	r.RLock()
 	r.templates = make(map[string]*template.Template)
-	r.RUnlock()
 }
 
 func Render(resp http.ResponseWriter, view string, data interface{}) (err error) {
