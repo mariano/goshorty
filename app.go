@@ -7,6 +7,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
+var router = mux.NewRouter()
+
 func ViewHandler(response http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	url, err := GetUrl(vars["id"])
@@ -56,10 +58,12 @@ func main() {
 	u.Delete()
 	*/
 
-	router := mux.NewRouter()
 	router.HandleFunc("/{id:[a-z0-9]{6}}", ViewHandler).Name("view")
 	router.HandleFunc("/{id:[a-z0-9]{6}}/stats", StatsHandler).Name("stats")
-	router.HandleFunc("/", HomeHandler)
+	router.HandleFunc("/", HomeHandler).Name("home")
+	for _, dir := range []string{"css", "js", "img"} {
+		router.PathPrefix("/" + dir + "/").Handler(http.StripPrefix("/" + dir + "/", http.FileServer(http.Dir("assets/" + dir))))
+	}
 
 	http.ListenAndServe(":8080", router)
 }

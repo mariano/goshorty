@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"path/filepath"
 )
 
 var templates = make(map[string]*template.Template)
@@ -60,7 +61,23 @@ func (this *View) build(file string, data interface{}) (body []byte, error error
 func (this *View) parse(file string, data interface{}) (body []byte, error error) {
 	var buf bytes.Buffer
 	if templates[file] == nil {
-		t, err := template.ParseFiles(file)
+		t := template.New(filepath.Base(file))
+		t.Funcs(template.FuncMap{
+			"url": func(name string, args ...string)(string) {
+				route := router.Get(name)
+				if route == nil {
+					return ""
+				}
+
+				url, err := route.URL(args...)
+				if err != nil {
+					return ""
+				}
+				return url.String()
+			},
+		})
+
+		_, err := t.ParseFiles(file)
 		if err != nil {
 			return nil, err
 		}
