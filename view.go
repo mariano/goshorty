@@ -11,7 +11,7 @@ import (
 var templates = make(map[string]*template.Template)
 
 func RenderView(response http.ResponseWriter, view string, data interface{}) {
-	v := load(view)
+	v := &View{name: view, layout: "layout"}
 	v.Set(data)
 
 	body, error := v.Render()
@@ -20,11 +20,6 @@ func RenderView(response http.ResponseWriter, view string, data interface{}) {
 		return
 	}
 	response.Write(body)
-}
-
-func load(name string) *View {
-	v := &View{name: name, layout: "layout"}
-	return v
 }
 
 type View struct {
