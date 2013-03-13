@@ -52,6 +52,12 @@ func NewUrl(data string) (entity *Url, err error) {
 
 	// Generate id
 
+	c, err := redis.Dial("tcp", REDIS_HOST + ":" + REDIS_PORT)
+	defer c.Close()
+	if err != nil {
+		return nil, err
+	}
+
 	bytes := make([]byte, ID_LENGTH)
 	for {
 		rand.Read(bytes)
@@ -59,6 +65,11 @@ func NewUrl(data string) (entity *Url, err error) {
 			bytes[i] = alphanum[b % byte(len(alphanum))]
 		}
 		id := string(bytes)
+		if exists, _ := redis.Bool(c.Do("EXISTS", REDIS_PREFIX + "url:" + id)); !exists {
+			entity.Id = id
+			break
+		}
+
 		if exists, _ := GetUrl(id); exists == nil {
 			entity.Id = id
 			break
