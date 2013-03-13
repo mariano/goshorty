@@ -1,1 +1,15 @@
-Hello World from {{.name}}! :)
+
+<div class="hero-unit">
+	<form action="{{url "add" }}" method="POST">
+		<div class="control-group {{if .error}}error{{end}}">
+			<label class="control-label" for="url">Paste your long URL here:</label>
+			<input type="text" name="url" id="url" class="span5" />
+			{{if .error}}
+				<span class="help-inline">{{.error}}</span>
+			{{end}}
+		</div>
+		<div class="btn-group">
+			<button type="submit" class="btn btn-primary btn-large">GoShorty me :]</button>
+		</div>
+	</form>
+</div>
