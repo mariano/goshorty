@@ -30,7 +30,7 @@ func Render(resp http.ResponseWriter, req *http.Request, view string, data inter
 }
 
 func RenderError(resp http.ResponseWriter, req *http.Request, message string, code int) (err error) {
-	body, err := render(req, "layout", "error", map[string]string{ "Error": message })
+	body, err := render(req, "layout", "error", map[string]string{"Error": message})
 	if err != nil {
 		http.Error(resp, err.Error(), http.StatusInternalServerError)
 		return
@@ -42,11 +42,11 @@ func RenderError(resp http.ResponseWriter, req *http.Request, message string, co
 }
 
 func render(req *http.Request, layout string, name string, data interface{}) (body []byte, err error) {
-	view, err := parse(req, "views/" + name + ".html", data)
+	view, err := parse(req, "views/"+name+".html", data)
 	if err != nil {
 		return
 	}
-	body, err = parse(req, "views/layouts/" + layout + ".html", map[string]template.HTML{"Content": template.HTML(view)})
+	body, err = parse(req, "views/layouts/"+layout+".html", map[string]template.HTML{"Content": template.HTML(view)})
 	if err != nil {
 		return
 	}
@@ -80,10 +80,10 @@ func parse(req *http.Request, file string, data interface{}) (body []byte, err e
 		}
 		t = template.New(filepath.Base(file))
 		t.Funcs(template.FuncMap{
-			"full_url": func(name string, args ...string) (string) {
+			"full_url": func(name string, args ...string) string {
 				return buildURL(name, true, args...)
 			},
-			"url": func(name string, args ...string) (string) {
+			"url": func(name string, args ...string) string {
 				return buildURL(name, false, args...)
 			},
 		})

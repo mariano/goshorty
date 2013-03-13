@@ -1,14 +1,14 @@
 package main
 
-import(
+import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"github.com/garyburd/redigo/redis"
 	"net/url"
 	"regexp"
 	"strings"
 	"time"
-	"github.com/garyburd/redigo/redis"
 )
 
 const (
@@ -16,9 +16,9 @@ const (
 )
 
 type Url struct {
-	Id string
+	Id          string
 	Destination string
-	Created time.Time
+	Created     time.Time
 }
 
 func NewUrl(data string) (entity *Url, err error) {
@@ -40,7 +40,7 @@ func NewUrl(data string) (entity *Url, err error) {
 		return
 	}
 
-	if matches, _ := regexp.MatchString("^[A-Za-z0-9.]*" + settings.RestrictDomain, u.Host); len(settings.RestrictDomain) > 0 && !matches {
+	if matches, _ := regexp.MatchString("^[A-Za-z0-9.]*"+settings.RestrictDomain, u.Host); len(settings.RestrictDomain) > 0 && !matches {
 		err = errors.New("Only URLs on " + settings.RestrictDomain + " domain allowed")
 		return
 	}
@@ -59,10 +59,10 @@ func NewUrl(data string) (entity *Url, err error) {
 	for {
 		rand.Read(bytes)
 		for i, b := range bytes {
-			bytes[i] = alphanum[b % byte(len(alphanum))]
+			bytes[i] = alphanum[b%byte(len(alphanum))]
 		}
 		id := string(bytes)
-		if exists, _ := redis.Bool(c.Do("EXISTS", settings.RedisPrefix + "url:" + id)); !exists {
+		if exists, _ := redis.Bool(c.Do("EXISTS", settings.RedisPrefix+"url:"+id)); !exists {
 			entity.Id = id
 			break
 		}
@@ -90,7 +90,7 @@ func (this *Url) Save() error {
 		return err
 	}
 
-	reply, err := c.Do("SET", settings.RedisPrefix + "url:" + this.Id, data)
+	reply, err := c.Do("SET", settings.RedisPrefix+"url:"+this.Id, data)
 	if err == nil && reply != "OK" {
 		err = errors.New("Invalid Redis response")
 	}
@@ -109,7 +109,7 @@ func (this *Url) Delete() error {
 		return err
 	}
 
-	reply, err := c.Do("DEL", settings.RedisPrefix + "url:" + this.Id)
+	reply, err := c.Do("DEL", settings.RedisPrefix+"url:"+this.Id)
 	if err == nil && reply != "OK" {
 		return errors.New("Invalid Redis response")
 	}
@@ -125,12 +125,11 @@ func GetUrl(id string) (*Url, error) {
 
 	defer c.Close()
 
-	reply, err := c.Do("GET", settings.RedisPrefix + "url:" + id)
+	reply, err := c.Do("GET", settings.RedisPrefix+"url:"+id)
 	if reply == nil {
 		return nil, nil
 	}
 
-	
 	data, err := redis.Bytes(reply, err)
 	if err != nil {
 		return nil, err

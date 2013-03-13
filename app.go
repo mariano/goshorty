@@ -3,23 +3,23 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/gorilla/mux"
 	"math"
 	"net/http"
 	"time"
-	"github.com/gorilla/mux"
 )
 
 type Settings struct {
-	RedisUrl string
-	RedisPrefix string
+	RedisUrl       string
+	RedisPrefix    string
 	RestrictDomain string
-	UrlLength int
+	UrlLength      int
 }
 
 func AddHandler(resp http.ResponseWriter, req *http.Request) {
 	url, err := NewUrl(req.FormValue("url"))
 	if err != nil {
-		Render(resp, req, "home", map[string]string{ "error": err.Error() })
+		Render(resp, req, "home", map[string]string{"error": err.Error()})
 		return
 	}
 
@@ -55,9 +55,9 @@ func StatsHandler(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	Render(resp, req, "stats", map[string]string{ 
-		"id": url.Id,
-		"url": url.Destination,
+	Render(resp, req, "stats", map[string]string{
+		"id":   url.Id,
+		"url":  url.Destination,
 		"when": relativeTime(time.Now().Sub(url.Created)),
 	})
 }
@@ -66,33 +66,33 @@ func HomeHandler(resp http.ResponseWriter, req *http.Request) {
 	Render(resp, req, "home", nil)
 }
 
-func relativeTime(duration time.Duration) (string) {
+func relativeTime(duration time.Duration) string {
 	hours := int64(math.Abs(duration.Hours()))
 	minutes := int64(math.Abs(duration.Minutes()))
 	when := ""
 	switch {
-		case hours >= (365 * 24):
-			when = "Over an year ago"
-		case hours > (30 * 24):
-			when = fmt.Sprintf("%d months ago", int64(hours / (30 * 24)))
-		case hours == (30 * 24):
-			when = "a month ago"
-		case hours > 24:
-			when = fmt.Sprintf("%d days ago", int64(hours / 24))
-		case hours == 24:
-			when = "yesterday"
-		case hours >= 2:
-			when = fmt.Sprintf("%d hours ago", hours)
-		case hours > 1:
-			when = "over an hour ago"
-		case hours == 1:
-			when = "an hour ago"
-		case minutes >= 2:
-			when = fmt.Sprintf("%d minutes ago", minutes)
-		case minutes > 1:
-			when = "a minute ago"
-		default:
-			when = "just now"
+	case hours >= (365 * 24):
+		when = "Over an year ago"
+	case hours > (30 * 24):
+		when = fmt.Sprintf("%d months ago", int64(hours/(30*24)))
+	case hours == (30 * 24):
+		when = "a month ago"
+	case hours > 24:
+		when = fmt.Sprintf("%d days ago", int64(hours/24))
+	case hours == 24:
+		when = "yesterday"
+	case hours >= 2:
+		when = fmt.Sprintf("%d hours ago", hours)
+	case hours > 1:
+		when = "over an hour ago"
+	case hours == 1:
+		when = "an hour ago"
+	case minutes >= 2:
+		when = fmt.Sprintf("%d minutes ago", minutes)
+	case minutes > 1:
+		when = "a minute ago"
+	default:
+		when = "just now"
 	}
 	return when
 }
@@ -117,11 +117,11 @@ func main() {
 	settings.RedisUrl = fmt.Sprintf("%s:%d", redisHost, redisPort)
 
 	router.HandleFunc("/add", AddHandler).Methods("POST").Name("add")
-	router.HandleFunc("/{id:" + regex + "}+", StatsHandler).Name("stats")
-	router.HandleFunc("/{id:" + regex + "}", RedirectHandler).Name("redirect")
+	router.HandleFunc("/{id:"+regex+"}+", StatsHandler).Name("stats")
+	router.HandleFunc("/{id:"+regex+"}", RedirectHandler).Name("redirect")
 	router.HandleFunc("/", HomeHandler).Name("home")
 	for _, dir := range []string{"css", "js", "img"} {
-		router.PathPrefix("/" + dir + "/").Handler(http.StripPrefix("/" + dir + "/", http.FileServer(http.Dir("assets/" + dir))))
+		router.PathPrefix("/" + dir + "/").Handler(http.StripPrefix("/"+dir+"/", http.FileServer(http.Dir("assets/"+dir))))
 	}
 
 	http.ListenAndServe(":8080", router)
