@@ -19,8 +19,8 @@ func init() {
 	r.templates = make(map[string]*template.Template)
 }
 
-func Render(resp http.ResponseWriter, view string, data interface{}) (err error) {
-	body, err := render("layout", view, data)
+func Render(resp http.ResponseWriter, req *http.Request, view string, data interface{}) (err error) {
+	body, err := render(req, "layout", view, data)
 	if err != nil {
 		http.Error(resp, err.Error(), http.StatusInternalServerError)
 		return
@@ -29,8 +29,8 @@ func Render(resp http.ResponseWriter, view string, data interface{}) (err error)
 	return
 }
 
-func RenderError(resp http.ResponseWriter, message string, code int) (err error) {
-	body, err := render("layout", "error", map[string]string{ "Error": message })
+func RenderError(resp http.ResponseWriter, req *http.Request, message string, code int) (err error) {
+	body, err := render(req, "layout", "error", map[string]string{ "Error": message })
 	if err != nil {
 		http.Error(resp, err.Error(), http.StatusInternalServerError)
 		return
@@ -41,37 +41,50 @@ func RenderError(resp http.ResponseWriter, message string, code int) (err error)
 	return
 }
 
-func render(layout string, name string, data interface{}) (body []byte, err error) {
-	view, err := parse("views/" + name + ".html", data)
+func render(req *http.Request, layout string, name string, data interface{}) (body []byte, err error) {
+	view, err := parse(req, "views/" + name + ".html", data)
 	if err != nil {
 		return
 	}
-	body, err = parse("views/layouts/" + layout + ".html", map[string]template.HTML{"Content": template.HTML(view)})
+	body, err = parse(req, "views/layouts/" + layout + ".html", map[string]template.HTML{"Content": template.HTML(view)})
 	if err != nil {
 		return
 	}
 	return
 }
 
-func parse(file string, data interface{}) (body []byte, err error) {
+func parse(req *http.Request, file string, data interface{}) (body []byte, err error) {
 	r.RLock()
 	t, present := r.templates[file]
 	r.RUnlock()
 
 	if !present {
+		buildURL := func(name string, full bool, args ...string) (urlString string) {
+			route := router.Get(name)
+			if route == nil {
+				return ""
+			}
+
+			url, err := route.URL(args...)
+			if err != nil {
+				return ""
+			}
+			urlString = url.String()
+			if full {
+				if urlString[0:1] != "/" {
+					urlString = "/" + urlString
+				}
+				urlString = "http://" + req.Host + urlString
+			}
+			return
+		}
 		t = template.New(filepath.Base(file))
 		t.Funcs(template.FuncMap{
-			"url": func(name string, args ...string)(string) {
-				route := router.Get(name)
-				if route == nil {
-					return ""
-				}
-
-				url, err := route.URL(args...)
-				if err != nil {
-					return ""
-				}
-				return url.String()
+			"full_url": func(name string, args ...string) (string) {
+				return buildURL(name, true, args...)
+			},
+			"url": func(name string, args ...string) (string) {
+				return buildURL(name, false, args...)
 			},
 		})
 
