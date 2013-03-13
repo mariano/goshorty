@@ -45,7 +45,10 @@ func StatsHandler(resp http.ResponseWriter, req *http.Request) {
 		RenderError(resp, "No URL was found with that goshorty code", http.StatusNotFound)
 		return
 	}
-	Render(resp, "stats", map[string]string{ "id": url.Id })
+	Render(resp, "stats", map[string]string{ 
+		"id": url.Id,
+		"url": url.Destination,
+	})
 }
 
 func HomeHandler(resp http.ResponseWriter, req *http.Request) {
