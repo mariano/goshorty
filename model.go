@@ -7,21 +7,18 @@ import(
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 	"github.com/garyburd/redigo/redis"
 )
 
 const (
-	REDIS_HOST = ""
-	REDIS_PORT = "6379"
-	REDIS_PREFIX = "getshorty:"
-	RESTRICT_DOMAIN = "workana.com"
-	ID_LENGTH = 6
-	alphanum = "0123456789abcdefghijklmnopqrstuvwxyz-"
+	alphanum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 )
 
 type Url struct {
 	Id string
 	Destination string
+	Created time.Time
 }
 
 func NewUrl(data string) (entity *Url, err error) {
@@ -43,29 +40,29 @@ func NewUrl(data string) (entity *Url, err error) {
 		return
 	}
 
-	if matches, _ := regexp.MatchString("^[A-Za-z0-9.]*" + RESTRICT_DOMAIN, u.Host); len(RESTRICT_DOMAIN) > 0 && !matches {
-		err = errors.New("Only URLs on " + RESTRICT_DOMAIN + " domain allowed")
+	if matches, _ := regexp.MatchString("^[A-Za-z0-9.]*" + settings.RestrictDomain, u.Host); len(settings.RestrictDomain) > 0 && !matches {
+		err = errors.New("Only URLs on " + settings.RestrictDomain + " domain allowed")
 		return
 	}
 
-	entity = &Url{Destination: u.String()}
+	entity = &Url{Destination: u.String(), Created: time.Now()}
 
 	// Generate id
 
-	c, err := redis.Dial("tcp", REDIS_HOST + ":" + REDIS_PORT)
+	c, err := redis.Dial("tcp", settings.RedisUrl)
 	defer c.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	bytes := make([]byte, ID_LENGTH)
+	bytes := make([]byte, settings.UrlLength)
 	for {
 		rand.Read(bytes)
 		for i, b := range bytes {
 			bytes[i] = alphanum[b % byte(len(alphanum))]
 		}
 		id := string(bytes)
-		if exists, _ := redis.Bool(c.Do("EXISTS", REDIS_PREFIX + "url:" + id)); !exists {
+		if exists, _ := redis.Bool(c.Do("EXISTS", settings.RedisPrefix + "url:" + id)); !exists {
 			entity.Id = id
 			break
 		}
@@ -82,7 +79,7 @@ func NewUrl(data string) (entity *Url, err error) {
 }
 
 func (this *Url) Save() error {
-	c, err := redis.Dial("tcp", REDIS_HOST + ":" + REDIS_PORT)
+	c, err := redis.Dial("tcp", settings.RedisUrl)
 	defer c.Close()
 	if err != nil {
 		return err
@@ -93,7 +90,7 @@ func (this *Url) Save() error {
 		return err
 	}
 
-	reply, err := c.Do("SET", REDIS_PREFIX + "url:" + this.Id, data)
+	reply, err := c.Do("SET", settings.RedisPrefix + "url:" + this.Id, data)
 	if err == nil && reply != "OK" {
 		err = errors.New("Invalid Redis response")
 	}
@@ -106,13 +103,13 @@ func (this *Url) Save() error {
 }
 
 func (this *Url) Delete() error {
-	c, err := redis.Dial("tcp", REDIS_HOST + ":" + REDIS_PORT)
+	c, err := redis.Dial("tcp", settings.RedisUrl)
 	defer c.Close()
 	if err != nil {
 		return err
 	}
 
-	reply, err := c.Do("DEL", REDIS_PREFIX + "url:" + this.Id)
+	reply, err := c.Do("DEL", settings.RedisPrefix + "url:" + this.Id)
 	if err == nil && reply != "OK" {
 		return errors.New("Invalid Redis response")
 	}
@@ -121,14 +118,14 @@ func (this *Url) Delete() error {
 }
 
 func GetUrl(id string) (*Url, error) {
-	c, err := redis.Dial("tcp", REDIS_HOST + ":" + REDIS_PORT)
+	c, err := redis.Dial("tcp", settings.RedisUrl)
 	if err != nil {
 		return nil, err
 	}
 
 	defer c.Close()
 
-	reply, err := c.Do("GET", REDIS_PREFIX + "url:" + id)
+	reply, err := c.Do("GET", settings.RedisPrefix + "url:" + id)
 	if reply == nil {
 		return nil, nil
 	}

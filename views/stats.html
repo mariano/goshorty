@@ -1,5 +1,11 @@
-<div class="well">
-	<a href="{{full_url "redirect" "id" .id}}">{{full_url "redirect" "id" .id}}</a>
-	-&gt;
-	<a href="{{.url}}">{{.url}}</a>
+<div class="stats">
+	<div class="row-fluid">
+		<div class="span5">
+			<div class="origin">{{full_url "redirect" "id" .id}}</div>
+		</div>
+		<div class="span6">
+			<a href="{{.url}}" rel="nofollow" class="destination">{{.url}}</a><br/>
+			<span class="muted">Created {{.when}}</span>
+		</div>
+	</div>
 </div>

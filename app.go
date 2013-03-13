@@ -1,11 +1,20 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+	"math"
 	"net/http"
+	"time"
 	"github.com/gorilla/mux"
 )
 
-var router = mux.NewRouter()
+type Settings struct {
+	RedisUrl string
+	RedisPrefix string
+	RestrictDomain string
+	UrlLength int
+}
 
 func AddHandler(resp http.ResponseWriter, req *http.Request) {
 	url, err := NewUrl(req.FormValue("url"))
@@ -45,9 +54,11 @@ func StatsHandler(resp http.ResponseWriter, req *http.Request) {
 		RenderError(resp, req, "No URL was found with that goshorty code", http.StatusNotFound)
 		return
 	}
+
 	Render(resp, req, "stats", map[string]string{ 
 		"id": url.Id,
 		"url": url.Destination,
+		"when": relativeTime(time.Now().Sub(url.Created)),
 	})
 }
 
@@ -55,10 +66,59 @@ func HomeHandler(resp http.ResponseWriter, req *http.Request) {
 	Render(resp, req, "home", nil)
 }
 
+func relativeTime(duration time.Duration) (string) {
+	hours := int64(math.Abs(duration.Hours()))
+	minutes := int64(math.Abs(duration.Minutes()))
+	when := ""
+	switch {
+		case hours >= (365 * 24):
+			when = "Over an year ago"
+		case hours > (30 * 24):
+			when = fmt.Sprintf("%d months ago", int64(hours / (30 * 24)))
+		case hours == (30 * 24):
+			when = "a month ago"
+		case hours > 24:
+			when = fmt.Sprintf("%d days ago", int64(hours / 24))
+		case hours == 24:
+			when = "yesterday"
+		case hours >= 2:
+			when = fmt.Sprintf("%d hours ago", hours)
+		case hours > 1:
+			when = "over an hour ago"
+		case hours == 1:
+			when = "an hour ago"
+		case minutes >= 2:
+			when = fmt.Sprintf("%d minutes ago", minutes)
+		case minutes > 1:
+			when = "a minute ago"
+		default:
+			when = "just now"
+	}
+	return when
+}
+
+var router = mux.NewRouter()
+var settings = new(Settings)
+
 func main() {
+	var redisHost string
+	var redisPort int
+	var regex string
+
+	flag.StringVar(&redisHost, "redis_host", "", "Redis host (leave empty for localhost)")
+	flag.IntVar(&redisPort, "redis_port", 6379, "Redis port")
+	flag.StringVar(&settings.RestrictDomain, "domain", "", "Restrict destination URLs to a single domain")
+	flag.IntVar(&settings.UrlLength, "length", 5, "How many characters should the short code have")
+	flag.StringVar(&regex, "regex", "[A-Za-z0-9]{%d}", "Regular expression to match route for accessing a short code. %d is replaced with <length> setting")
+
+	flag.Parse()
+
+	regex = fmt.Sprintf(regex, settings.UrlLength)
+	settings.RedisUrl = fmt.Sprintf("%s:%d", redisHost, redisPort)
+
 	router.HandleFunc("/add", AddHandler).Methods("POST").Name("add")
-	router.HandleFunc("/{id:[a-z0-9]{6}}+", StatsHandler).Name("stats")
-	router.HandleFunc("/{id:[a-z0-9]{6}}", RedirectHandler).Name("redirect")
+	router.HandleFunc("/{id:" + regex + "}+", StatsHandler).Name("stats")
+	router.HandleFunc("/{id:" + regex + "}", RedirectHandler).Name("redirect")
 	router.HandleFunc("/", HomeHandler).Name("home")
 	for _, dir := range []string{"css", "js", "img"} {
 		router.PathPrefix("/" + dir + "/").Handler(http.StripPrefix("/" + dir + "/", http.FileServer(http.Dir("assets/" + dir))))
