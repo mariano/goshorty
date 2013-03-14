@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"net/url"
 	"regexp"
@@ -78,6 +79,32 @@ func NewUrl(data string) (entity *Url, err error) {
 	return entity, nil
 }
 
+func GetUrl(id string) (*Url, error) {
+	c, err := redis.Dial("tcp", settings.RedisUrl)
+	if err != nil {
+		return nil, err
+	}
+
+	defer c.Close()
+
+	reply, err := c.Do("GET", settings.RedisPrefix+"url:"+id)
+	if reply == nil {
+		return nil, nil
+	}
+
+	data, err := redis.Bytes(reply, err)
+	if err != nil {
+		return nil, err
+	}
+
+	var url Url
+	if err := json.Unmarshal(data, &url); err != nil {
+		return nil, err
+	}
+
+	return &url, nil
+}
+
 func (this *Url) Save() error {
 	c, err := redis.Dial("tcp", settings.RedisUrl)
 	defer c.Close()
@@ -117,28 +144,69 @@ func (this *Url) Delete() error {
 	return nil
 }
 
-func GetUrl(id string) (*Url, error) {
+func (this *Url) Hit() (err error) {
 	c, err := redis.Dial("tcp", settings.RedisUrl)
-	if err != nil {
-		return nil, err
-	}
-
 	defer c.Close()
-
-	reply, err := c.Do("GET", settings.RedisPrefix+"url:"+id)
-	if reply == nil {
-		return nil, nil
+	if err != nil {
+		return
 	}
 
-	data, err := redis.Bytes(reply, err)
+	now := time.Now()
+	year, month, day := now.Date()
+	prefix := settings.RedisPrefix + "stats:" + this.Id + ":"
+
+	c.Send("INCR", prefix + "hits")
+	c.Send("INCR", fmt.Sprintf(prefix + "year:%d", year))
+	c.Send("INCR", fmt.Sprintf(prefix + "month:%d-%d", year, month))
+	c.Send("INCR", fmt.Sprintf(prefix + "day:%d-%d-%d", year, month, day))
+	c.Send("INCR", fmt.Sprintf(prefix + "hour:%d-%d-%d %d", year, month, day, now.Hour()))
+	c.Flush()
+
+	fmt.Println("HIT!", settings.RedisPrefix + "url:" + this.Id)
+	return
+}
+
+func (this *Url) Stats() (stats map[string]int64, err error) {
+	c, err := redis.Dial("tcp", settings.RedisUrl)
+	defer c.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	var url Url
-	if err := json.Unmarshal(data, &url); err != nil {
+	now := time.Now()
+	year, month, day := now.Date()
+	prefix := settings.RedisPrefix + "stats:" + this.Id + ":"
+
+	reply, err := redis.Values(c.Do(
+		"MGET", 
+		prefix + "hits", 
+		fmt.Sprintf(prefix + "year:%d", year),
+		fmt.Sprintf(prefix + "month:%d-%d", year, month),
+		fmt.Sprintf(prefix + "day:%d-%d-%d", year, month, day),
+		fmt.Sprintf(prefix + "hour:%d-%d-%d %d", year, month, day, now.Hour()),
+	))
+
+	stats = map[string]int64{
+		"hits": 0,
+		"year": 0,
+		"day": 0,
+		"hour": 0,
+	}
+
+	var (
+		tHits int64
+		tYear int64
+		tDay int64
+		tHour int64
+	)
+	if _, err = redis.Scan(reply, &tHits, &tYear, &tDay, &tHour); err != nil {
 		return nil, err
 	}
 
-	return &url, nil
+	stats["hits"] = tHits
+	stats["year"] = tYear
+	stats["day"] = tDay
+	stats["hour"] = tHour
+
+	return
 }
