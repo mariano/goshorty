@@ -57,7 +57,8 @@ func StatsHandler(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	stats, _ := url.Stats()
+	stats, _ := url.Stats("hour")
+	fmt.Println(stats)
 	Render(resp, req, "stats", map[string]string{
 		"id":   url.Id,
 		"url":  url.Destination,
