@@ -1,4 +1,5 @@
-<div class="stats">
+{{load_js "/js/stats.js"}}
+<div class="stats" id="stats" rel="{{url "stat" "id" .id "what" "day"}}">
 	<div class="row-fluid">
 		<div class="span5">
 			<div class="origin">{{full_url "redirect" "id" .id}}</div>
@@ -10,5 +11,23 @@
 	</div>
 
 	<br />
-	<div class="well span2">Total Hits: <strong>{{.hits}}</strong></div>
+	
+	<div class="row-fluid">
+		<div class="well span2">Total Hits: <strong>{{.hits}}</strong></div>
+		<div class="span10 change" id="change">
+			Clicks for this:
+			<a href="#hour">hour</a>
+			|
+			<a href="#day">day</a>
+			|
+			<a href="#week">week</a>
+			|
+			<a href="#month">month</a>
+			|
+			<a href="#year">year</a>
+			|
+			<a href="#all">all time</a>
+		</div>
+	</div>
+	<div id="chart" style="width: 900px; height: 500px;"></div>
 </div>

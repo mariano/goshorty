@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"html/template"
 	"net/http"
 	"path/filepath"
@@ -11,12 +12,14 @@ import (
 type registry struct {
 	sync.RWMutex
 	templates map[string]*template.Template
+	js map[string]string
 }
 
 var r registry
 
 func init() {
 	r.templates = make(map[string]*template.Template)
+	r.js = make(map[string]string)
 }
 
 func Render(resp http.ResponseWriter, req *http.Request, view string, data interface{}) (err error) {
@@ -42,11 +45,20 @@ func RenderError(resp http.ResponseWriter, req *http.Request, message string, co
 }
 
 func render(req *http.Request, layout string, name string, data interface{}) (body []byte, err error) {
-	view, err := parse(req, "views/"+name+".html", data)
+	file := "views/"+name+".html"
+	view, err := parse(req, file, data)
 	if err != nil {
 		return
 	}
-	body, err = parse(req, "views/layouts/"+layout+".html", map[string]template.HTML{"Content": template.HTML(view)})
+
+	r.RLock()
+	javascript, _ := r.js[file]
+	r.RUnlock()
+
+	body, err = parse(req, "views/layouts/"+layout+".html", map[string]template.HTML{
+		"Content": template.HTML(view),
+		"Javascript": template.HTML(javascript),
+	})
 	if err != nil {
 		return
 	}
@@ -57,6 +69,8 @@ func parse(req *http.Request, file string, data interface{}) (body []byte, err e
 	r.RLock()
 	t, present := r.templates[file]
 	r.RUnlock()
+
+	var jsFiles []string
 
 	if !present {
 		buildURL := func(name string, full bool, args ...string) (urlString string) {
@@ -86,6 +100,12 @@ func parse(req *http.Request, file string, data interface{}) (body []byte, err e
 			"url": func(name string, args ...string) string {
 				return buildURL(name, false, args...)
 			},
+			"load_js": func(file string, args ...string) string {
+				if file != "" {
+					jsFiles = append(jsFiles, file)
+				}
+				return ""
+			},
 		})
 
 		_, err = t.ParseFiles(file)
@@ -102,5 +122,20 @@ func parse(req *http.Request, file string, data interface{}) (body []byte, err e
 	if err != nil {
 		return
 	}
+
+	if (!present && len(jsFiles) > 0) {
+		javascript := ""
+		for i, file := range jsFiles {
+			if i > 0 {
+				javascript += "\n"
+			}
+			javascript += fmt.Sprintf("<script type=\"text/javascript\" src=\"%s\"></script>", file)
+		}
+
+		r.Lock()
+		r.js[file] = javascript
+		r.Unlock()
+	}
+
 	return buf.Bytes(), nil
 }

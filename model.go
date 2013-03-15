@@ -8,6 +8,8 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"net/url"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -15,16 +17,21 @@ import (
 const (
 	alphanum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 	keyy = "year:%d"
-	keym = "month:%d-%d"
-	keyd = "day:%d-%d-%d"
-	keyh = "hour:%d-%d-%d %d"
-	keyi = "minute:%d-%d-%d %d:%d"
+	keym = "month:%0d-%0.2d"
+	keyd = "day:%d-%0.2d-%0.2d"
+	keyh = "hour:%d-%0.2d-%0.2d %0.2d"
+	keyi = "minute:%d-%0.2d-%0.2d %0.2d:%0.2d"
 )
 
 type Url struct {
 	Id          string
 	Destination string
 	Created     time.Time
+}
+
+type Stat struct {
+	Name string
+	Value int
 }
 
 func NewUrl(data string) (entity *Url, err error) {
@@ -184,7 +191,18 @@ func (this *Url) Hit() (err error) {
 	return
 }
 
-func (this *Url) Stats(what string) (stats map[string]int, err error) {
+func (this *Url) Hits() (total int, err error) {
+	c, err := redis.Dial("tcp", settings.RedisUrl)
+	defer c.Close()
+	if err != nil {
+		return total, err
+	}
+
+	prefix := settings.RedisPrefix + "stats:" + this.Id + ":"
+	return redis.Int(c.Do("GET", prefix + "hits"))
+}
+
+func (this *Url) Stats(past string) (stats []*Stat, err error) {
 	c, err := redis.Dial("tcp", settings.RedisUrl)
 	defer c.Close()
 	if err != nil {
@@ -195,55 +213,125 @@ func (this *Url) Stats(what string) (stats map[string]int, err error) {
 	year, month, day := now.Date()
 	prefix := settings.RedisPrefix + "stats:" + this.Id + ":"
 
-	stats = map[string]int{"hits": 0}
-	reply, err := redis.Int(c.Do("GET", prefix + "hits"))
-	if err != nil {
-		return stats, err
-	}
-	stats["hits"] = reply
-
 	var (
 		separator string
 		search string
 		moment int
+		start int
+		limit int
+		increment int
 	)
 
+	start = 1
+	increment = 1
+	format := func(value string) (string, error) {
+		return value, nil
+	}
 	switch {
-	case what == "hour":
+	case past == "hour":
 		search = prefix + keyi
 		separator = " %d:"
 		moment = now.Hour()
 		search = fmt.Sprintf(search[0:strings.LastIndex(search, ":")] + ":*", year, month, day, moment)
-		stats["0"], stats["15"], stats["30"], stats["45"] = 0, 0, 0, 0
-	case what == "day":
+		start = 0
+		limit = 45
+		increment = 15
+		format = func(value string) (string, error) {
+			return fmt.Sprintf("%0.2d:%s", moment, value), nil
+		}
+	case past == "day":
 		search = prefix + keyh
 		separator = "-%d"
 		moment = day
 		search = fmt.Sprintf(search[0:strings.LastIndex(search, " ")] + "*", year, month, moment)
-		for i := 0; i < 24; i++ {
-			stats[fmt.Sprintf("%d", i)] = 0
+		limit = 24
+		format = func(value string) (string, error) {
+			return fmt.Sprintf("%s:00", value), nil
 		}
-	case what == "month":
+	case past == "week":
 		search = prefix + keyd
 		separator = "%d-"
 		moment = int(month)
-		search = fmt.Sprintf(search[0:strings.LastIndex(search, "-%d")] + "*", year, moment)
-		for i := 0; i < 31; i++ {
-			stats[fmt.Sprintf("%d", i)] = 0
+		search = fmt.Sprintf(search[0:strings.LastIndex(search, "-%0.2d")] + "*", year, moment)
+		start = day - (int(now.Weekday()) - 1)
+		limit = start + 6
+		format = func(value string) (string, error) {
+			date := fmt.Sprintf("%d-%0.2d-%s", year, month, value)
+			time, err := time.Parse("2006-01-02", date)
+			if err != nil {
+				fmt.Println("ERROR:", date, err.Error())
+				return "", err
+			}
+			return fmt.Sprintf("%s %s", time.Weekday().String(), value), nil
 		}
-	case what == "year":
+	case past == "month":
+		search = prefix + keyd
+		separator = "%d-"
+		moment = int(month)
+		search = fmt.Sprintf(search[0:strings.LastIndex(search, "-%0.2d")] + "*", year, moment)
+		limit = time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
+		format = func(value string) (string, error) {
+			date := fmt.Sprintf("%d-%0.2d-%s", year, month, value)
+			time, err := time.Parse("2006-01-02", date)
+			if err != nil {
+				fmt.Println("ERROR:", date, err.Error())
+				return "", err
+			}
+			month, _ := strconv.ParseInt(value, 10, 32)
+			return fmt.Sprintf("%s %d", time.Month().String(), month), nil
+		}
+	case past == "year":
 		search = prefix + keym
 		separator = "%d-"
 		moment = year
-		search = fmt.Sprintf(search[0:strings.LastIndex(search, "-%d")] + "*", moment)
-		for i := 0; i < 12; i++ {
-			stats[fmt.Sprintf("%d", i)] = 0
+		search = fmt.Sprintf(search[0:strings.LastIndex(search, "-%0.2d")] + "*", moment)
+		limit = 12
+		format = func(value string) (string, error) {
+			date := fmt.Sprintf("%d-%s-01", year, value)
+			time, err := time.Parse("2006-01-02", date)
+			if err != nil {
+				fmt.Println("ERROR:", date, err.Error())
+				return "", err
+			}
+			return fmt.Sprintf("%s %d", time.Month().String(), year), nil
 		}
+	case past == "all":
+		search = prefix + keyy
+		separator = ":"
+		search = search[0:strings.LastIndex(search, "%d")] + "*"
+		start = now.Year() - 10
+		limit = int(now.Year()) + 1
+	default:
+		return nil, errors.New(fmt.Sprintf("Invalid stat requested: %s", past))
 	}
 
-	stats, err = getStats(c, search, separator, moment, stats)
+	result := make(map[string]int)
+	for i := start; i < limit; i += increment {
+		result[fmt.Sprintf("%0.2d", i)] = 0
+	}
+	result, err = getStats(c, search, separator, moment, result)
 	if err != nil {
-		return stats, err
+		return nil, err
+	}
+
+	keys := make([]string, len(result))
+	i := 0
+	for k, _ := range result {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+
+	length := len(keys)
+	stats = make([]*Stat, length)
+
+	i = 0
+	for i = 0; i < length; i++ {
+		name, err := format(keys[i])
+		if err != nil {
+			name = keys[i]
+		}
+		stats[i] = &Stat{Name: name, Value: result[keys[i]]}
 	}
 
 	return stats, nil
@@ -278,12 +366,14 @@ func getStats(c redis.Conn, search string, separator string, moment int, stats m
 		return stats, err
 	}
 
-	separator = fmt.Sprintf(separator, moment)
+	if strings.Index(separator, "%d") >= 0 {
+		separator = fmt.Sprintf(separator, moment)
+	}
 
 	for i, value := range values {
 		total, err := redis.Int(value, nil)
 		if err == nil {
-			key := strings.TrimSpace(keys[i][strings.LastIndex(keys[i], separator) + len(separator):])
+			key := strings.TrimSpace(keys[i][(strings.LastIndex(keys[i], separator) + len(separator)):])
 			stats[key] = total
 		}
 	}

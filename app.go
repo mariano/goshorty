@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -46,6 +47,45 @@ func RedirectHandler(resp http.ResponseWriter, req *http.Request) {
 	http.Redirect(resp, req, url.Destination, http.StatusMovedPermanently)
 }
 
+func StatHandler(resp http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+
+	if req.Header.Get("X-Requested-With") == "" {
+		statsUrl, err := router.Get("stats").URL("id", vars["id"])
+		if err != nil {
+			RenderError(resp, req, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		http.Redirect(resp, req, statsUrl.String(), http.StatusFound)
+		return
+	}
+
+	url, err := GetUrl(vars["id"])
+	if err != nil {
+		RenderError(resp, req, err.Error(), http.StatusInternalServerError)
+		return
+	} else if url == nil {
+		RenderError(resp, req, "No URL was found with that goshorty code", http.StatusNotFound)
+		return
+	}
+
+	var body []byte
+
+	stats, err := url.Stats(vars["what"])
+	if err == nil {
+		body, err = json.Marshal(stats)
+	}
+
+	if err != nil {
+		body = []byte(fmt.Sprintf("{\"error\":\"%s\"}", err.Error()))
+	}
+
+	resp.Header().Set("Content-Type", "application/json");
+	resp.Write(body)
+}
+
+
 func StatsHandler(resp http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	url, err := GetUrl(vars["id"])
@@ -57,13 +97,17 @@ func StatsHandler(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	stats, _ := url.Stats("hour")
-	fmt.Println(stats)
+	hits, err := url.Hits()
+	if err != nil {
+		RenderError(resp, req, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	Render(resp, req, "stats", map[string]string{
 		"id":   url.Id,
 		"url":  url.Destination,
 		"when": relativeTime(time.Now().Sub(url.Created)),
-		"hits": fmt.Sprintf("%d", stats["hits"]),
+		"hits": fmt.Sprintf("%d", hits),
 	})
 }
 
@@ -131,6 +175,7 @@ func main() {
 	settings.RedisPrefix = redisPrefix
 
 	router.HandleFunc("/add", AddHandler).Methods("POST").Name("add")
+	router.HandleFunc("/{id:"+regex+"}+/{what:(hour|day|week|month|year|all)}", StatHandler).Name("stat")
 	router.HandleFunc("/{id:"+regex+"}+", StatsHandler).Name("stats")
 	router.HandleFunc("/{id:"+regex+"}", RedirectHandler).Name("redirect")
 	router.HandleFunc("/", HomeHandler).Name("home")
@@ -139,5 +184,8 @@ func main() {
 	}
 
 	fmt.Println(fmt.Sprintf("Server is listening on port %d", port))
-	http.ListenAndServe(fmt.Sprintf(":%d", port), router)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", port), router)
+	if (err != nil) {
+		panic(err)
+	}
 }

@@ -27,3 +27,15 @@ body {
 	text-decoration: none;
 	word-wrap: break-word;
 }
+
+.stats .change {
+	padding-top: 38px;
+	text-align: right;
+	color: #777;
+	vertical-align: bottom;
+}
+
+.stats .change a {
+	color; #15c;
+	text-decoration: none;
+}
