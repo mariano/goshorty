@@ -18,14 +18,17 @@
 			dataType: "json",
 			url: url.replace(/\/day$/, "/" + what),
 			success: function(data) {
-				var values = [];
+				var values = [ ["", "Hits"] ],
+					maxValue = 0;
 				for (var i=0, limit=data.length; i < limit; i++) {
+					if (data[i].Value > maxValue) {
+						maxValue = data[i].Value;
+					}
 					values.push([ data[i].Name, data[i].Value ]);
 				}
-				console.log(values);
 				chart.draw(google.visualization.arrayToDataTable(values), {
-					"vAxis.minValue": 0,
-					"titlePosition": "none"
+					"vAxis": {"viewWindowMode": "explicit", "viewWindow": { "min": 0 }, "format": maxValue >= 3 ? "#" : "#.#"},
+					"legend": {"position": "none"}
 				});
 			}
 		});

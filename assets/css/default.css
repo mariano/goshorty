@@ -28,6 +28,20 @@ body {
 	word-wrap: break-word;
 }
 
+.stats .hits {
+	color: #777;
+	border: 1px solid #c6c6c6;
+	font-weight: bold;
+	padding: 10px 20px;
+	box-shadow: 0 2px 2px rgba(0, 0, 0, 0.1);
+	-webkit-box-shadow: 0 2px 2px rgba(0, 0, 0, 0.1)
+}
+
+.stats .hits .total {
+	color: #222;
+	font-size: 30px;
+}
+
 .stats .change {
 	padding-top: 38px;
 	text-align: right;
