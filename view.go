@@ -12,7 +12,7 @@ import (
 type registry struct {
 	sync.RWMutex
 	templates map[string]*template.Template
-	js map[string]string
+	js        map[string]string
 }
 
 var r registry
@@ -45,7 +45,7 @@ func RenderError(resp http.ResponseWriter, req *http.Request, message string, co
 }
 
 func render(req *http.Request, layout string, name string, data interface{}) (body []byte, err error) {
-	file := "views/"+name+".html"
+	file := "views/" + name + ".html"
 	view, err := parse(req, file, data)
 	if err != nil {
 		return
@@ -56,7 +56,7 @@ func render(req *http.Request, layout string, name string, data interface{}) (bo
 	r.RUnlock()
 
 	body, err = parse(req, "views/layouts/"+layout+".html", map[string]template.HTML{
-		"Content": template.HTML(view),
+		"Content":    template.HTML(view),
 		"Javascript": template.HTML(javascript),
 	})
 	if err != nil {
@@ -123,7 +123,7 @@ func parse(req *http.Request, file string, data interface{}) (body []byte, err e
 		return
 	}
 
-	if (!present && len(jsFiles) > 0) {
+	if !present && len(jsFiles) > 0 {
 		javascript := ""
 		for i, file := range jsFiles {
 			if i > 0 {

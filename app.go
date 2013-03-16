@@ -81,10 +81,9 @@ func StatHandler(resp http.ResponseWriter, req *http.Request) {
 		body = []byte(fmt.Sprintf("{\"error\":\"%s\"}", err.Error()))
 	}
 
-	resp.Header().Set("Content-Type", "application/json");
+	resp.Header().Set("Content-Type", "application/json")
 	resp.Write(body)
 }
-
 
 func StatsHandler(resp http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
@@ -147,17 +146,17 @@ func relativeTime(duration time.Duration) string {
 }
 
 var (
-	router = mux.NewRouter()
+	router   = mux.NewRouter()
 	settings = new(Settings)
 )
 
 func main() {
 	var (
-		redisHost string
-		redisPort int
+		redisHost   string
+		redisPort   int
 		redisPrefix string
-		regex string
-		port int
+		regex       string
+		port        int
 	)
 
 	flag.StringVar(&redisHost, "redis_host", "", "Redis host (leave empty for localhost)")
@@ -185,7 +184,7 @@ func main() {
 
 	fmt.Println(fmt.Sprintf("Server is listening on port %d", port))
 	err := http.ListenAndServe(fmt.Sprintf(":%d", port), router)
-	if (err != nil) {
+	if err != nil {
 		panic(err)
 	}
 }
