@@ -172,7 +172,24 @@ func main() {
 	regex = fmt.Sprintf(regex, settings.UrlLength)
 	settings.RedisUrl = fmt.Sprintf("%s:%d", redisHost, redisPort)
 	settings.RedisPrefix = redisPrefix
+	
 
+	url, err := GetUrl("49U4d")
+	if err != nil {
+		panic(err)
+		return
+	}
+
+	var body []byte
+
+	stats, err := url.Stats("day")
+	if err == nil {
+		body, err = json.Marshal(stats)
+	}
+
+	fmt.Println(string(body))
+
+	/*
 	router.HandleFunc("/add", AddHandler).Methods("POST").Name("add")
 	router.HandleFunc("/{id:"+regex+"}+/{what:(hour|day|week|month|year|all)}", StatHandler).Name("stat")
 	router.HandleFunc("/{id:"+regex+"}+", StatsHandler).Name("stats")
@@ -187,4 +204,5 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	*/
 }

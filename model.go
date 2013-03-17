@@ -335,7 +335,7 @@ func getStats(c redis.Conn, search string, separator string, moment int, start i
 		return stats, err
 	}
 
-	redisKeys := make([]string, len(values))
+	redisKeys := make([]interface{}, len(values))
 	i := 0
 	for _, value := range values {
 		key, err := redis.String(value, nil)
@@ -345,13 +345,7 @@ func getStats(c redis.Conn, search string, separator string, moment int, start i
 		}
 	}
 
-	// Convert slice to interface
-
-	args := make([]interface{}, len(redisKeys))
-	for i, v := range redisKeys {
-		args[i] = v
-	}
-	values, err = redis.Values(c.Do("MGET", args...))
+	values, err = redis.Values(c.Do("MGET", redisKeys...))
 	if err != nil {
 		return stats, err
 	}
@@ -363,11 +357,12 @@ func getStats(c redis.Conn, search string, separator string, moment int, start i
 	for i, value := range values {
 		total, err := redis.Int(value, nil)
 		if err == nil {
-			redisKey := redisKeys[i]
-			key := strings.TrimSpace(redisKey[(strings.LastIndex(redisKey, separator) + len(separator)):])
-			index, present := keys[key]
-			if present {
-				stats[index].Value = total
+			if redisKey, ok := redisKeys[i].(string); ok {
+				key := strings.TrimSpace(redisKey[(strings.LastIndex(redisKey, separator) + len(separator)):])
+				index, present := keys[key]
+				if present {
+					stats[index].Value = total
+				}
 			}
 		}
 	}
