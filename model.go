@@ -158,25 +158,56 @@ func (this *Url) Delete() error {
 	return nil
 }
 
-func (this *Url) Hit() (err error) {
+func (this *Url) Hit(r *Request) (err error) {
 	c, err := redis.Dial("tcp", settings.RedisUrl)
 	defer c.Close()
 	if err != nil {
 		return
 	}
 
+	fmt.Println("REQ DATA: ", r)
+
 	now := time.Now()
 	year, month, day := now.Date()
 	hour := now.Hour()
 	minute := 5 * int(math.Abs(float64(now.Minute()/5)))
 	prefix := settings.RedisPrefix + "stats:" + this.Id + ":"
+	hitsPrefix := prefix + "hits:"
+	countriesPrefix := prefix + "countries:"
+	browsersPrefix := prefix + "browsers:"
+	osPrefix := prefix + "os:"
 
-	c.Send("INCR", prefix+"hits")
-	c.Send("INCR", fmt.Sprintf(prefix+keyy, year))
-	c.Send("INCR", fmt.Sprintf(prefix+keym, year, month))
-	c.Send("INCR", fmt.Sprintf(prefix+keyd, year, month, day))
-	c.Send("INCR", fmt.Sprintf(prefix+keyh, year, month, day, hour))
-	c.Send("INCR", fmt.Sprintf(prefix+keyi, year, month, day, hour, minute))
+	c.Send("INCR", hitsPrefix+"total")
+	c.Send("INCR", fmt.Sprintf(hitsPrefix+keyy, year))
+	c.Send("INCR", fmt.Sprintf(hitsPrefix+keym, year, month))
+	c.Send("INCR", fmt.Sprintf(hitsPrefix+keyd, year, month, day))
+	c.Send("INCR", fmt.Sprintf(hitsPrefix+keyh, year, month, day, hour))
+	c.Send("INCR", fmt.Sprintf(hitsPrefix+keyi, year, month, day, hour, minute))
+
+	if r.Country != "" {
+		c.Send("INCR", countriesPrefix+"total:" + r.Country)
+		c.Send("INCR", fmt.Sprintf(countriesPrefix+keyy+":"+r.Country, year))
+		c.Send("INCR", fmt.Sprintf(countriesPrefix+keym+":"+r.Country, year, month))
+		c.Send("INCR", fmt.Sprintf(countriesPrefix+keyd+":"+r.Country, year, month, day))
+		c.Send("INCR", fmt.Sprintf(countriesPrefix+keyh+":"+r.Country, year, month, day, hour))
+		c.Send("INCR", fmt.Sprintf(countriesPrefix+keyi+":"+r.Country, year, month, day, hour, minute))
+	}
+
+	if !r.Bot {
+		c.Send("INCR", browsersPrefix+"total:" + r.Browser)
+		c.Send("INCR", fmt.Sprintf(browsersPrefix+keyy+":"+r.Browser, year))
+		c.Send("INCR", fmt.Sprintf(browsersPrefix+keym+":"+r.Browser, year, month))
+		c.Send("INCR", fmt.Sprintf(browsersPrefix+keyd+":"+r.Browser, year, month, day))
+		c.Send("INCR", fmt.Sprintf(browsersPrefix+keyh+":"+r.Browser, year, month, day, hour))
+		c.Send("INCR", fmt.Sprintf(browsersPrefix+keyi+":"+r.Browser, year, month, day, hour, minute))
+
+		c.Send("INCR", osPrefix+"total:" + r.OS)
+		c.Send("INCR", fmt.Sprintf(osPrefix+keyy+":"+r.OS, year))
+		c.Send("INCR", fmt.Sprintf(osPrefix+keym+":"+r.OS, year, month))
+		c.Send("INCR", fmt.Sprintf(osPrefix+keyd+":"+r.OS, year, month, day))
+		c.Send("INCR", fmt.Sprintf(osPrefix+keyh+":"+r.OS, year, month, day, hour))
+		c.Send("INCR", fmt.Sprintf(osPrefix+keyi+":"+r.OS, year, month, day, hour, minute))
+	}
 
 	c.Flush()
 	return
@@ -189,8 +220,8 @@ func (this *Url) Hits() (total int, err error) {
 		return total, err
 	}
 
-	prefix := settings.RedisPrefix + "stats:" + this.Id + ":"
-	result, err := c.Do("GET", prefix+"hits")
+	prefix := settings.RedisPrefix + "stats:" + this.Id + ":hits:"
+	result, err := c.Do("GET", prefix+"total")
 	if result == nil {
 		return 0, nil
 	}
@@ -206,7 +237,7 @@ func (this *Url) Stats(past string) (stats []*Stat, err error) {
 
 	now := time.Now()
 	year, month, day := now.Date()
-	prefix := settings.RedisPrefix + "stats:" + this.Id + ":"
+	prefix := settings.RedisPrefix + "stats:" + this.Id + ":hits:"
 
 	var (
 		separator string
@@ -313,7 +344,6 @@ func getStats(c redis.Conn, search string, separator string, moment int, start i
 	length := int(math.Ceil(float64((limit - start) / increment)))
 	stats := make([]*Stat, length)
 
-	keys := make(map[string]int, length)
 	redisKeys := make([]interface{}, length)
 	j := 0
 
@@ -325,7 +355,6 @@ func getStats(c redis.Conn, search string, separator string, moment int, start i
 			name = key
 		}
 
-		keys[key] = j
 		redisKeys[j] = prefix + key
 		stats[j] = &Stat{
 			Name:  name,
@@ -346,13 +375,7 @@ func getStats(c redis.Conn, search string, separator string, moment int, start i
 	for i, value := range values {
 		total, err := redis.Int(value, nil)
 		if err == nil {
-			if redisKey, ok := redisKeys[i].(string); ok {
-				key := strings.TrimSpace(redisKey[(strings.LastIndex(redisKey, separator) + len(separator)):])
-				index, present := keys[key]
-				if present {
-					stats[index].Value = total
-				}
-			}
+			stats[i].Value = total
 		}
 	}
 

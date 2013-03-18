@@ -11,10 +11,10 @@ import (
 )
 
 type Settings struct {
-	RedisUrl       string
+	RedisUrl	   string
 	RedisPrefix    string
 	RestrictDomain string
-	UrlLength      int
+	UrlLength	   int
 }
 
 func AddHandler(resp http.ResponseWriter, req *http.Request) {
@@ -43,7 +43,8 @@ func RedirectHandler(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	go url.Hit()
+	request, _ := requestParser.Parse(req)
+	go url.Hit(request)
 	http.Redirect(resp, req, url.Destination, http.StatusMovedPermanently)
 }
 
@@ -103,8 +104,8 @@ func StatsHandler(resp http.ResponseWriter, req *http.Request) {
 	}
 
 	Render(resp, req, "stats", map[string]string{
-		"id":   url.Id,
-		"url":  url.Destination,
+		"id":	url.Id,
+		"url":	url.Destination,
 		"when": relativeTime(time.Now().Sub(url.Created)),
 		"hits": fmt.Sprintf("%d", hits),
 	})
@@ -146,17 +147,19 @@ func relativeTime(duration time.Duration) string {
 }
 
 var (
-	router   = mux.NewRouter()
+	router	 = mux.NewRouter()
 	settings = new(Settings)
+	requestParser *RequestParser
 )
 
 func main() {
 	var (
-		redisHost   string
-		redisPort   int
+		geoDb		string
+		redisHost	string
+		redisPort	int
 		redisPrefix string
-		regex       string
-		port        int
+		regex		string
+		port		int
 	)
 
 	flag.StringVar(&redisHost, "redis_host", "", "Redis host (leave empty for localhost)")
@@ -166,8 +169,15 @@ func main() {
 	flag.IntVar(&settings.UrlLength, "length", 5, "How many characters should the short code have")
 	flag.StringVar(&regex, "regex", "[A-Za-z0-9]{%d}", "Regular expression to match route for accessing a short code. %d is replaced with <length> setting")
 	flag.IntVar(&port, "port", 8080, "Port where server is listening on")
+	flag.StringVar(&geoDb, "geo_db", "./GeoIP.dat", "Location to the MaxMind GeoIP country database file")
 
 	flag.Parse()
+
+	var err error
+	requestParser, err = NewRequestParser(geoDb)
+	if err != nil {
+		panic(err)
+	}
 
 	regex = fmt.Sprintf(regex, settings.UrlLength)
 	settings.RedisUrl = fmt.Sprintf("%s:%d", redisHost, redisPort)
@@ -183,7 +193,7 @@ func main() {
 	}
 
 	fmt.Println(fmt.Sprintf("Server is listening on port %d", port))
-	err := http.ListenAndServe(fmt.Sprintf(":%d", port), router)
+	err = http.ListenAndServe(fmt.Sprintf(":%d", port), router)
 	if err != nil {
 		panic(err)
 	}
