@@ -183,6 +183,35 @@ func main() {
 	settings.RedisUrl = fmt.Sprintf("%s:%d", redisHost, redisPort)
 	settings.RedisPrefix = redisPrefix
 
+	/*
+	url, err := GetUrl("jdl0N")
+	if err != nil {
+		panic(err)
+		return
+	}
+
+	var body []byte
+
+	stats, err := url.Countries()
+	if err == nil {
+		body, err = json.Marshal(stats)
+	}
+	fmt.Println(string(body))
+
+	stats, err = url.Browsers()
+	if err == nil {
+		body, err = json.Marshal(stats)
+	}
+	fmt.Println(string(body))
+
+
+	stats, err = url.OS()
+	if err == nil {
+		body, err = json.Marshal(stats)
+	}
+	fmt.Println(string(body))
+	*/
+
 	router.HandleFunc("/add", AddHandler).Methods("POST").Name("add")
 	router.HandleFunc("/{id:"+regex+"}+/{what:(hour|day|week|month|year|all)}", StatHandler).Name("stat")
 	router.HandleFunc("/{id:"+regex+"}+", StatsHandler).Name("stats")

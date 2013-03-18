@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +35,8 @@ type Stat struct {
 	Value int
 }
 
+type Stats []*Stat
+type Descending Stats
 type Format func(string) (string, error)
 
 func NewUrl(data string) (entity *Url, err error) {
@@ -165,8 +168,6 @@ func (this *Url) Hit(r *Request) (err error) {
 		return
 	}
 
-	fmt.Println("REQ DATA: ", r)
-
 	now := time.Now()
 	year, month, day := now.Date()
 	hour := now.Hour()
@@ -228,7 +229,63 @@ func (this *Url) Hits() (total int, err error) {
 	return redis.Int(result, err)
 }
 
-func (this *Url) Stats(past string) (stats []*Stat, err error) {
+func (this *Url) Countries() (Stats, error) {
+	return this.keyStats(settings.RedisPrefix + "stats:" + this.Id + ":countries:total:*")
+}
+
+func (this *Url) Browsers() (Stats, error) {
+	return this.keyStats(settings.RedisPrefix + "stats:" + this.Id + ":browsers:total:*")
+}
+
+func (this *Url) OS() (Stats, error) {
+	return this.keyStats(settings.RedisPrefix + "stats:" + this.Id + ":os:total:*")
+}
+
+func (this *Url) keyStats(search string) (stats Stats, err error) {
+	c, err := redis.Dial("tcp", settings.RedisUrl)
+	defer c.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	values, err := redis.Values(c.Do("KEYS", search))
+	if err != nil {
+		return nil, err
+	} else if len(values) == 0 {
+		return nil, nil
+	}
+
+	keys := make([]interface{}, len(values))
+	i := 0
+	for _, value := range values {
+		key, err := redis.String(value, nil)
+		if err == nil {
+			keys[i] = key
+			i++
+		}
+	}
+	
+	values, err = redis.Values(c.Do("MGET", keys...))
+	if err != nil {
+		return nil, err
+	}
+
+	stats = make(Stats, len(values))
+
+	for i, value := range values {
+		key := keys[i].(string)
+		total, err := redis.Int(value, nil)
+		if err == nil {
+			stats[i] = &Stat{ Name: key[strings.LastIndex(key, ":")+1:], Value: total }
+		}
+	}
+
+	sort.Sort(stats)
+
+	return stats, nil
+}
+
+func (this *Url) Stats(past string) (stats Stats, err error) {
 	c, err := redis.Dial("tcp", settings.RedisUrl)
 	defer c.Close()
 	if err != nil {
@@ -340,9 +397,9 @@ func (this *Url) Stats(past string) (stats []*Stat, err error) {
 	return stats, nil
 }
 
-func getStats(c redis.Conn, search string, separator string, moment int, start int, limit int, increment int, format Format) ([]*Stat, error) {
+func getStats(c redis.Conn, search string, separator string, moment int, start int, limit int, increment int, format Format) (Stats, error) {
 	length := int(math.Ceil(float64((limit - start) / increment)))
-	stats := make([]*Stat, length)
+	stats := make(Stats, length)
 
 	redisKeys := make([]interface{}, length)
 	j := 0
@@ -380,4 +437,16 @@ func getStats(c redis.Conn, search string, separator string, moment int, start i
 	}
 
 	return stats, nil
+}
+
+func (s Stats) Len() int {
+	return len(s)
+}
+
+func (s Stats) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s Stats) Less(i, j int) bool {
+	return s[i].Value >= s[j].Value
 }
