@@ -14,15 +14,15 @@ type RequestParser struct {
 
 type Request struct {
 	Referrer string
-	Country string
-	Bot bool
-	Mobile bool
-	OS string
-	Browser string
-	Version string
+	Country  string
+	Bot      bool
+	Mobile   bool
+	OS       string
+	Browser  string
+	Version  string
 }
 
-func NewRequestParser(geoDb string) (parser *RequestParser, err error){
+func NewRequestParser(geoDb string) (parser *RequestParser, err error) {
 	parser = &RequestParser{}
 	parser.gi, err = libgeo.Load(geoDb)
 	if err != nil {

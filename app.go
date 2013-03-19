@@ -11,10 +11,10 @@ import (
 )
 
 type Settings struct {
-	RedisUrl	   string
+	RedisUrl       string
 	RedisPrefix    string
 	RestrictDomain string
-	UrlLength	   int
+	UrlLength      int
 }
 
 func AddHandler(resp http.ResponseWriter, req *http.Request) {
@@ -72,7 +72,7 @@ func StatHandler(resp http.ResponseWriter, req *http.Request) {
 	}
 
 	var (
-		body []byte
+		body  []byte
 		stats Stats
 	)
 
@@ -121,8 +121,8 @@ func StatsHandler(resp http.ResponseWriter, req *http.Request) {
 	}
 
 	Render(resp, req, "stats", map[string]string{
-		"id":	url.Id,
-		"url":	url.Destination,
+		"id":   url.Id,
+		"url":  url.Destination,
 		"when": relativeTime(time.Now().Sub(url.Created)),
 		"hits": fmt.Sprintf("%d", hits),
 	})
@@ -164,19 +164,19 @@ func relativeTime(duration time.Duration) string {
 }
 
 var (
-	router	 = mux.NewRouter()
-	settings = new(Settings)
+	router        = mux.NewRouter()
+	settings      = new(Settings)
 	requestParser *RequestParser
 )
 
 func main() {
 	var (
-		geoDb		string
-		redisHost	string
-		redisPort	int
+		geoDb       string
+		redisHost   string
+		redisPort   int
 		redisPrefix string
-		regex		string
-		port		int
+		regex       string
+		port        int
 	)
 
 	flag.StringVar(&redisHost, "redis_host", "", "Redis host (leave empty for localhost)")

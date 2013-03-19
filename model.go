@@ -187,7 +187,7 @@ func (this *Url) Hit(r *Request) (err error) {
 	c.Send("INCR", fmt.Sprintf(hitsPrefix+keyi, year, month, day, hour, minute))
 
 	if r.Country != "" {
-		c.Send("INCR", countriesPrefix+"total:" + r.Country)
+		c.Send("INCR", countriesPrefix+"total:"+r.Country)
 		c.Send("INCR", fmt.Sprintf(countriesPrefix+keyy+":"+r.Country, year))
 		c.Send("INCR", fmt.Sprintf(countriesPrefix+keym+":"+r.Country, year, month))
 		c.Send("INCR", fmt.Sprintf(countriesPrefix+keyd+":"+r.Country, year, month, day))
@@ -196,14 +196,14 @@ func (this *Url) Hit(r *Request) (err error) {
 	}
 
 	if !r.Bot {
-		c.Send("INCR", browsersPrefix+"total:" + r.Browser)
+		c.Send("INCR", browsersPrefix+"total:"+r.Browser)
 		c.Send("INCR", fmt.Sprintf(browsersPrefix+keyy+":"+r.Browser, year))
 		c.Send("INCR", fmt.Sprintf(browsersPrefix+keym+":"+r.Browser, year, month))
 		c.Send("INCR", fmt.Sprintf(browsersPrefix+keyd+":"+r.Browser, year, month, day))
 		c.Send("INCR", fmt.Sprintf(browsersPrefix+keyh+":"+r.Browser, year, month, day, hour))
 		c.Send("INCR", fmt.Sprintf(browsersPrefix+keyi+":"+r.Browser, year, month, day, hour, minute))
 
-		c.Send("INCR", osPrefix+"total:" + r.OS)
+		c.Send("INCR", osPrefix+"total:"+r.OS)
 		c.Send("INCR", fmt.Sprintf(osPrefix+keyy+":"+r.OS, year))
 		c.Send("INCR", fmt.Sprintf(osPrefix+keym+":"+r.OS, year, month))
 		c.Send("INCR", fmt.Sprintf(osPrefix+keyd+":"+r.OS, year, month, day))
@@ -211,7 +211,7 @@ func (this *Url) Hit(r *Request) (err error) {
 		c.Send("INCR", fmt.Sprintf(osPrefix+keyi+":"+r.OS, year, month, day, hour, minute))
 	}
 
-	c.Send("INCR", referrerPrefix+"total:" + r.Referrer)
+	c.Send("INCR", referrerPrefix+"total:"+r.Referrer)
 	c.Send("INCR", fmt.Sprintf(referrerPrefix+keyy+":"+r.Referrer, year))
 	c.Send("INCR", fmt.Sprintf(referrerPrefix+keym+":"+r.Referrer, year, month))
 	c.Send("INCR", fmt.Sprintf(referrerPrefix+keyd+":"+r.Referrer, year, month, day))
@@ -276,7 +276,7 @@ func (this *Url) keyStats(search string) (stats Stats, err error) {
 			i++
 		}
 	}
-	
+
 	values, err = redis.Values(c.Do("MGET", keys...))
 	if err != nil {
 		return nil, err
@@ -288,7 +288,7 @@ func (this *Url) keyStats(search string) (stats Stats, err error) {
 		key := keys[i].(string)
 		total, err := redis.Int(value, nil)
 		if err == nil {
-			stats[i] = &Stat{ Name: key[strings.LastIndex(key, ":")+1:], Value: total }
+			stats[i] = &Stat{Name: key[strings.LastIndex(key, ":")+1:], Value: total}
 		}
 	}
 
