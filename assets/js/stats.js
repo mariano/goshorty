@@ -40,104 +40,38 @@
 		});
 	};
 
-	var loadCountries = function() {
+	var loadSources = function() {
 		var url = $("#stats").attr("rel");
 		if (!url) {
 			return;
 		}
 
-		var chart = new google.visualization.GeoChart($('#countriesChart').get(0));
 		$.ajax({
 			type: "GET",
 			dataType: "json",
-			url: url.replace(/\/day$/, "/countries"),
+			url: url.replace(/\/day$/, "/sources"),
 			success: function(data) {
-				var maxValue = 0,
-					values = parseValues(data);
-				for (var i=0, limit=values.length; i < limit; i++) {
-					if (values[i][1] > 0 && values[i][1] > maxValue) {
-						maxValue = values[i][1];
-					}
+				if (!data.Browsers || !data.Countries || !data.OS || !data.Referrers) {
+					return;
 				}
-				chart.draw(google.visualization.arrayToDataTable(values), {
+
+				var charts = {
+					browsers: new google.visualization.PieChart($('#browsersChart').get(0)),
+					countries: new google.visualization.GeoChart($('#countriesChart').get(0)),
+					os: new google.visualization.PieChart($('#osChart').get(0)),
+					referrers: new google.visualization.ColumnChart($('#referrersChart').get(0))
+				};
+
+				charts.browsers.draw(google.visualization.arrayToDataTable(parseValues(data.Browsers)), {
+					"legend": {"position": "bottom"}
+				});
+				charts.countries.draw(google.visualization.arrayToDataTable(parseValues(data.Countries)), {
 					"colorAxis": {"colors": ['red','#004411']}
 				});
-			}
-		});
-	};
-
-	var loadBrowsers = function() {
-		var url = $("#stats").attr("rel");
-		if (!url) {
-			return;
-		}
-
-		var chart = new google.visualization.PieChart($('#browsersChart').get(0));
-		$.ajax({
-			type: "GET",
-			dataType: "json",
-			url: url.replace(/\/day$/, "/browsers"),
-			success: function(data) {
-				var maxValue = 0,
-					values = parseValues(data);
-				for (var i=0, limit=values.length; i < limit; i++) {
-					if (values[i][1] > 0 && values[i][1] > maxValue) {
-						maxValue = values[i][1];
-					}
-				}
-				chart.draw(google.visualization.arrayToDataTable(values), {
+				charts.os.draw(google.visualization.arrayToDataTable(parseValues(data.OS)), {
 					"legend": {"position": "bottom"}
 				});
-			}
-		});
-	};
-
-	var loadOS = function() {
-		var url = $("#stats").attr("rel");
-		if (!url) {
-			return;
-		}
-
-		var chart = new google.visualization.PieChart($('#osChart').get(0));
-		$.ajax({
-			type: "GET",
-			dataType: "json",
-			url: url.replace(/\/day$/, "/os"),
-			success: function(data) {
-				var maxValue = 0,
-					values = parseValues(data);
-				for (var i=0, limit=values.length; i < limit; i++) {
-					if (values[i][1] > 0 && values[i][1] > maxValue) {
-						maxValue = values[i][1];
-					}
-				}
-				chart.draw(google.visualization.arrayToDataTable(values), {
-					"legend": {"position": "bottom"}
-				});
-			}
-		});
-	};
-
-	var loadReferrers = function() {
-		var url = $("#stats").attr("rel");
-		if (!url) {
-			return;
-		}
-
-		var chart = new google.visualization.ColumnChart($('#referrersChart').get(0));
-		$.ajax({
-			type: "GET",
-			dataType: "json",
-			url: url.replace(/\/day$/, "/referrers"),
-			success: function(data) {
-				var maxValue = 0,
-					values = parseValues(data);
-				for (var i=0, limit=values.length; i < limit; i++) {
-					if (values[i][1] > 0 && values[i][1] > maxValue) {
-						maxValue = values[i][1];
-					}
-				}
-				chart.draw(google.visualization.arrayToDataTable(values), {
+				charts.referrers.draw(google.visualization.arrayToDataTable(parseValues(data.Referrers)), {
 					"legend": {"position": "none"}
 				});
 			}
@@ -153,10 +87,7 @@
 			});
 
 			loadHits(location.href);
-			loadBrowsers();
-			loadCountries();
-			loadOS();
-			loadReferrers();
+			loadSources();
 		});
 	});
 })(jQuery);

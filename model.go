@@ -35,6 +35,13 @@ type Stat struct {
 	Value int
 }
 
+type SourceStats struct {
+	Countries Stats
+	Browsers  Stats
+	OS        Stats
+	Referrers Stats
+}
+
 type Stats []*Stat
 type Descending Stats
 type Format func(string) (string, error)
@@ -237,64 +244,44 @@ func (this *Url) Hits() (total int, err error) {
 	return redis.Int(result, err)
 }
 
-func (this *Url) Countries() (Stats, error) {
-	return this.keyStats(settings.RedisPrefix + "stats:" + this.Id + ":countries:total:*")
+func (this *Url) Countries(sorting bool) (Stats, error) {
+	return this.keyStats(settings.RedisPrefix+"stats:"+this.Id+":countries:total:*", sorting)
 }
 
-func (this *Url) Browsers() (Stats, error) {
-	return this.keyStats(settings.RedisPrefix + "stats:" + this.Id + ":browsers:total:*")
+func (this *Url) Browsers(sorting bool) (Stats, error) {
+	return this.keyStats(settings.RedisPrefix+"stats:"+this.Id+":browsers:total:*", sorting)
 }
 
-func (this *Url) OS() (Stats, error) {
-	return this.keyStats(settings.RedisPrefix + "stats:" + this.Id + ":os:total:*")
+func (this *Url) OS(sorting bool) (Stats, error) {
+	return this.keyStats(settings.RedisPrefix+"stats:"+this.Id+":os:total:*", sorting)
 }
 
-func (this *Url) Referrers() (Stats, error) {
-	return this.keyStats(settings.RedisPrefix + "stats:" + this.Id + ":referrers:total:*")
+func (this *Url) Referrers(sorting bool) (Stats, error) {
+	return this.keyStats(settings.RedisPrefix+"stats:"+this.Id+":referrers:total:*", sorting)
 }
 
-func (this *Url) keyStats(search string) (stats Stats, err error) {
-	c, err := redis.Dial("tcp", settings.RedisUrl)
-	defer c.Close()
+func (this *Url) Sources(sorting bool) (stats SourceStats, err error) {
+	stats.Browsers, err = this.Browsers(sorting)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	values, err := redis.Values(c.Do("KEYS", search))
+	stats.Countries, err = this.Countries(sorting)
 	if err != nil {
-		return nil, err
-	} else if len(values) == 0 {
-		return nil, nil
+		return
 	}
 
-	keys := make([]interface{}, len(values))
-	i := 0
-	for _, value := range values {
-		key, err := redis.String(value, nil)
-		if err == nil {
-			keys[i] = key
-			i++
-		}
-	}
-
-	values, err = redis.Values(c.Do("MGET", keys...))
+	stats.OS, err = this.OS(sorting)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	stats = make(Stats, len(values))
-
-	for i, value := range values {
-		key := keys[i].(string)
-		total, err := redis.Int(value, nil)
-		if err == nil {
-			stats[i] = &Stat{Name: key[strings.LastIndex(key, ":")+1:], Value: total}
-		}
+	stats.Referrers, err = this.Referrers(sorting)
+	if err != nil {
+		return
 	}
 
-	sort.Sort(stats)
-
-	return stats, nil
+	return
 }
 
 func (this *Url) Stats(past string) (stats Stats, err error) {
@@ -404,6 +391,52 @@ func (this *Url) Stats(past string) (stats Stats, err error) {
 	stats, err = getStats(c, search, separator, moment, start, limit, increment, format)
 	if err != nil {
 		return nil, err
+	}
+
+	return stats, nil
+}
+
+func (this *Url) keyStats(search string, sorting bool) (stats Stats, err error) {
+	c, err := redis.Dial("tcp", settings.RedisUrl)
+	defer c.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	values, err := redis.Values(c.Do("KEYS", search))
+	if err != nil {
+		return nil, err
+	} else if len(values) == 0 {
+		return nil, nil
+	}
+
+	keys := make([]interface{}, len(values))
+	i := 0
+	for _, value := range values {
+		key, err := redis.String(value, nil)
+		if err == nil {
+			keys[i] = key
+			i++
+		}
+	}
+
+	values, err = redis.Values(c.Do("MGET", keys...))
+	if err != nil {
+		return nil, err
+	}
+
+	stats = make(Stats, len(values))
+
+	for i, value := range values {
+		key := keys[i].(string)
+		total, err := redis.Int(value, nil)
+		if err == nil {
+			stats[i] = &Stat{Name: key[strings.LastIndex(key, ":")+1:], Value: total}
+		}
+	}
+
+	if sorting {
+		sort.Sort(stats)
 	}
 
 	return stats, nil

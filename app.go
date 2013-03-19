@@ -51,7 +51,7 @@ func RedirectHandler(resp http.ResponseWriter, req *http.Request) {
 func StatHandler(resp http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 
-	if false && req.Header.Get("X-Requested-With") == "" {
+	if req.Header.Get("X-Requested-With") == "" {
 		statsUrl, err := router.Get("stats").URL("id", vars["id"])
 		if err != nil {
 			RenderError(resp, req, err.Error(), http.StatusInternalServerError)
@@ -71,26 +71,19 @@ func StatHandler(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var (
-		body  []byte
-		stats Stats
-	)
+	var body []byte
 
 	switch {
-	case vars["what"] == "countries":
-		stats, err = url.Countries()
-	case vars["what"] == "browsers":
-		stats, err = url.Browsers()
-	case vars["what"] == "os":
-		stats, err = url.OS()
-	case vars["what"] == "referrers":
-		stats, err = url.Referrers()
+	case vars["what"] == "sources":
+		stats, err := url.Sources(false)
+		if err == nil {
+			body, err = json.Marshal(stats)
+		}
 	default:
-		stats, err = url.Stats(vars["what"])
-	}
-
-	if err == nil {
-		body, err = json.Marshal(stats)
+		stats, err := url.Stats(vars["what"])
+		if err == nil {
+			body, err = json.Marshal(stats)
+		}
 	}
 
 	if err != nil {
@@ -199,7 +192,7 @@ func main() {
 	settings.RedisPrefix = redisPrefix
 
 	router.HandleFunc("/add", AddHandler).Methods("POST").Name("add")
-	router.HandleFunc("/{id:"+regex+"}+/{what:(hour|day|week|month|year|all|countries|browsers|os|referrers)}", StatHandler).Name("stat")
+	router.HandleFunc("/{id:"+regex+"}+/{what:(hour|day|week|month|year|all|sources)}", StatHandler).Name("stat")
 	router.HandleFunc("/{id:"+regex+"}+", StatsHandler).Name("stats")
 	router.HandleFunc("/{id:"+regex+"}", RedirectHandler).Name("redirect")
 	router.HandleFunc("/", HomeHandler).Name("home")
