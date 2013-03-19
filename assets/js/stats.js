@@ -59,7 +59,9 @@
 						maxValue = values[i][1];
 					}
 				}
-				chart.draw(google.visualization.arrayToDataTable(values));
+				chart.draw(google.visualization.arrayToDataTable(values), {
+					"colorAxis": {"colors": ['red','#004411']}
+				});
 			}
 		});
 	};
