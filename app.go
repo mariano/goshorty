@@ -71,9 +71,24 @@ func StatHandler(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var body []byte
+	var (
+		body []byte
+		stats Stats
+	)
 
-	stats, err := url.Stats(vars["what"])
+	switch {
+	case vars["what"] == "country":
+		stats, err = url.Countries()
+	case vars["what"] == "browser":
+		stats, err = url.Browsers()
+	case vars["what"] == "os":
+		stats, err = url.OS()
+	case vars["what"] == "referrer":
+		stats, err = url.Referrers()
+	default:
+		stats, err = url.Stats(vars["what"])
+	}
+
 	if err == nil {
 		body, err = json.Marshal(stats)
 	}
@@ -96,6 +111,8 @@ func StatsHandler(resp http.ResponseWriter, req *http.Request) {
 		RenderError(resp, req, "No URL was found with that goshorty code", http.StatusNotFound)
 		return
 	}
+
+	fmt.Println(req.Referer())
 
 	hits, err := url.Hits()
 	if err != nil {
@@ -182,35 +199,6 @@ func main() {
 	regex = fmt.Sprintf(regex, settings.UrlLength)
 	settings.RedisUrl = fmt.Sprintf("%s:%d", redisHost, redisPort)
 	settings.RedisPrefix = redisPrefix
-
-	/*
-	url, err := GetUrl("jdl0N")
-	if err != nil {
-		panic(err)
-		return
-	}
-
-	var body []byte
-
-	stats, err := url.Countries()
-	if err == nil {
-		body, err = json.Marshal(stats)
-	}
-	fmt.Println(string(body))
-
-	stats, err = url.Browsers()
-	if err == nil {
-		body, err = json.Marshal(stats)
-	}
-	fmt.Println(string(body))
-
-
-	stats, err = url.OS()
-	if err == nil {
-		body, err = json.Marshal(stats)
-	}
-	fmt.Println(string(body))
-	*/
 
 	router.HandleFunc("/add", AddHandler).Methods("POST").Name("add")
 	router.HandleFunc("/{id:"+regex+"}+/{what:(hour|day|week|month|year|all)}", StatHandler).Name("stat")

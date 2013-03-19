@@ -13,6 +13,7 @@ type RequestParser struct {
 }
 
 type Request struct {
+	Referrer string
 	Country string
 	Bot bool
 	Mobile bool
@@ -35,6 +36,10 @@ func (this *RequestParser) Parse(req *http.Request) (r *Request, err error) {
 	r.Country, err = this.geo(req)
 	ua := new(user_agent.UserAgent)
 	ua.Parse(req.UserAgent())
+	r.Referrer = req.Referer()
+	if r.Referrer == "" {
+		r.Referrer = "DIRECT"
+	}
 	r.Bot = ua.Bot()
 	r.Mobile = ua.Mobile()
 	r.OS = ua.OS()

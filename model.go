@@ -177,6 +177,7 @@ func (this *Url) Hit(r *Request) (err error) {
 	countriesPrefix := prefix + "countries:"
 	browsersPrefix := prefix + "browsers:"
 	osPrefix := prefix + "os:"
+	referrerPrefix := prefix + "referrers:"
 
 	c.Send("INCR", hitsPrefix+"total")
 	c.Send("INCR", fmt.Sprintf(hitsPrefix+keyy, year))
@@ -210,6 +211,13 @@ func (this *Url) Hit(r *Request) (err error) {
 		c.Send("INCR", fmt.Sprintf(osPrefix+keyi+":"+r.OS, year, month, day, hour, minute))
 	}
 
+	c.Send("INCR", referrerPrefix+"total:" + r.Referrer)
+	c.Send("INCR", fmt.Sprintf(referrerPrefix+keyy+":"+r.Referrer, year))
+	c.Send("INCR", fmt.Sprintf(referrerPrefix+keym+":"+r.Referrer, year, month))
+	c.Send("INCR", fmt.Sprintf(referrerPrefix+keyd+":"+r.Referrer, year, month, day))
+	c.Send("INCR", fmt.Sprintf(referrerPrefix+keyh+":"+r.Referrer, year, month, day, hour))
+	c.Send("INCR", fmt.Sprintf(referrerPrefix+keyi+":"+r.Referrer, year, month, day, hour, minute))
+
 	c.Flush()
 	return
 }
@@ -239,6 +247,10 @@ func (this *Url) Browsers() (Stats, error) {
 
 func (this *Url) OS() (Stats, error) {
 	return this.keyStats(settings.RedisPrefix + "stats:" + this.Id + ":os:total:*")
+}
+
+func (this *Url) Referrers() (Stats, error) {
+	return this.keyStats(settings.RedisPrefix + "stats:" + this.Id + ":referrers:total:*")
 }
 
 func (this *Url) keyStats(search string) (stats Stats, err error) {
