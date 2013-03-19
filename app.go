@@ -51,7 +51,7 @@ func RedirectHandler(resp http.ResponseWriter, req *http.Request) {
 func StatHandler(resp http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 
-	if req.Header.Get("X-Requested-With") == "" {
+	if false && req.Header.Get("X-Requested-With") == "" {
 		statsUrl, err := router.Get("stats").URL("id", vars["id"])
 		if err != nil {
 			RenderError(resp, req, err.Error(), http.StatusInternalServerError)
@@ -77,13 +77,13 @@ func StatHandler(resp http.ResponseWriter, req *http.Request) {
 	)
 
 	switch {
-	case vars["what"] == "country":
+	case vars["what"] == "countries":
 		stats, err = url.Countries()
-	case vars["what"] == "browser":
+	case vars["what"] == "browsers":
 		stats, err = url.Browsers()
 	case vars["what"] == "os":
 		stats, err = url.OS()
-	case vars["what"] == "referrer":
+	case vars["what"] == "referrers":
 		stats, err = url.Referrers()
 	default:
 		stats, err = url.Stats(vars["what"])
@@ -111,8 +111,6 @@ func StatsHandler(resp http.ResponseWriter, req *http.Request) {
 		RenderError(resp, req, "No URL was found with that goshorty code", http.StatusNotFound)
 		return
 	}
-
-	fmt.Println(req.Referer())
 
 	hits, err := url.Hits()
 	if err != nil {
@@ -201,7 +199,7 @@ func main() {
 	settings.RedisPrefix = redisPrefix
 
 	router.HandleFunc("/add", AddHandler).Methods("POST").Name("add")
-	router.HandleFunc("/{id:"+regex+"}+/{what:(hour|day|week|month|year|all)}", StatHandler).Name("stat")
+	router.HandleFunc("/{id:"+regex+"}+/{what:(hour|day|week|month|year|all|countries|browsers|os|referrers)}", StatHandler).Name("stat")
 	router.HandleFunc("/{id:"+regex+"}+", StatsHandler).Name("stats")
 	router.HandleFunc("/{id:"+regex+"}", RedirectHandler).Name("redirect")
 	router.HandleFunc("/", HomeHandler).Name("home")
