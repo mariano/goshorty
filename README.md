@@ -48,5 +48,6 @@ $ gunzip GeoIP.dat.gz
 # Build & Run #
 
 ```bash
-$ go run *.go
+$ go build
+$ ./goshorty
 ```
