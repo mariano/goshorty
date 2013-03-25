@@ -5,8 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gorilla/mux"
+	"io"
+	"io/ioutil"
 	"math"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -15,6 +18,49 @@ type Settings struct {
 	RedisPrefix    string
 	RestrictDomain string
 	UrlLength      int
+}
+
+type ApiAddRequest struct {
+	LongUrl string
+}
+
+func ApiAddHandler(resp http.ResponseWriter, req *http.Request) {
+	body, err := ioutil.ReadAll(req.Body);
+	if err != nil {
+		RenderJsonError(resp, req, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var message ApiAddRequest
+	dec := json.NewDecoder(strings.NewReader(string(body)))
+	for {
+		if err := dec.Decode(&message); err == io.EOF {
+			break
+		} else if err != nil {
+			RenderJsonError(resp, req, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	if message.LongUrl == "" {
+		RenderJsonError(resp, req, "No URL to shorten", http.StatusBadRequest)
+		return
+	}
+
+	url, err := NewUrl(message.LongUrl)
+	if err != nil {
+		RenderJsonError(resp, req, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	shortUrl, err := router.Get("redirect").URL("id", url.Id)
+	if err != nil {
+		RenderJsonError(resp, req, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	json := fmt.Sprintf("{\"id\":\"http://%s%s\",\"longUrl\":\"%s\"}", req.Host, shortUrl, url.Destination)
+	resp.Write([]byte(json))
 }
 
 func AddHandler(resp http.ResponseWriter, req *http.Request) {
@@ -191,6 +237,7 @@ func main() {
 	settings.RedisUrl = fmt.Sprintf("%s:%d", redisHost, redisPort)
 	settings.RedisPrefix = redisPrefix
 
+	router.HandleFunc("/api/v1/url", ApiAddHandler).Methods("POST").Name("add")
 	router.HandleFunc("/add", AddHandler).Methods("POST").Name("add")
 	router.HandleFunc("/{id:"+regex+"}+/{what:(hour|day|week|month|year|all|sources)}", StatHandler).Name("stat")
 	router.HandleFunc("/{id:"+regex+"}+", StatsHandler).Name("stats")

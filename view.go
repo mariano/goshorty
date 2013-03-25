@@ -44,6 +44,12 @@ func RenderError(resp http.ResponseWriter, req *http.Request, message string, co
 	return
 }
 
+func RenderJsonError(resp http.ResponseWriter, req *http.Request, message string, code int) (err error) {
+	resp.WriteHeader(code)
+	resp.Write([]byte(fmt.Sprintf("{\"error\":\"%s\"}", message)))
+	return
+}
+
 func render(req *http.Request, layout string, name string, data interface{}) (body []byte, err error) {
 	file := "views/" + name + ".html"
 	view, err := parse(req, file, data)

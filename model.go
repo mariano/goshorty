@@ -46,6 +46,26 @@ type Stats []*Stat
 type Descending Stats
 type Format func(string) (string, error)
 
+var pool *redis.Pool;
+
+func init() {
+	pool = &redis.Pool{
+		MaxIdle: 5,
+		IdleTimeout: 240 * time.Second,
+		Dial: func () (redis.Conn, error) {
+			c, err := redis.Dial("tcp", settings.RedisUrl)
+			if err != nil {
+				return nil, err
+			}
+			return c, nil
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
+		},
+	}
+}
+
 func NewUrl(data string) (entity *Url, err error) {
 	data = strings.TrimSpace(data)
 	if len(data) == 0 {
@@ -72,13 +92,8 @@ func NewUrl(data string) (entity *Url, err error) {
 
 	entity = &Url{Destination: u.String(), Created: time.Now()}
 
-	// Generate id
-
-	c, err := redis.Dial("tcp", settings.RedisUrl)
+	c := pool.Get()
 	defer c.Close()
-	if err != nil {
-		return nil, err
-	}
 
 	bytes := make([]byte, settings.UrlLength)
 	for {
@@ -104,11 +119,7 @@ func NewUrl(data string) (entity *Url, err error) {
 }
 
 func GetUrl(id string) (*Url, error) {
-	c, err := redis.Dial("tcp", settings.RedisUrl)
-	if err != nil {
-		return nil, err
-	}
-
+	c := pool.Get()
 	defer c.Close()
 
 	reply, err := c.Do("GET", settings.RedisPrefix+"url:"+id)
@@ -130,11 +141,8 @@ func GetUrl(id string) (*Url, error) {
 }
 
 func (this *Url) Save() error {
-	c, err := redis.Dial("tcp", settings.RedisUrl)
+	c := pool.Get()
 	defer c.Close()
-	if err != nil {
-		return err
-	}
 
 	data, err := json.Marshal(this)
 	if err != nil {
@@ -154,11 +162,8 @@ func (this *Url) Save() error {
 }
 
 func (this *Url) Delete() error {
-	c, err := redis.Dial("tcp", settings.RedisUrl)
+	c := pool.Get()
 	defer c.Close()
-	if err != nil {
-		return err
-	}
 
 	reply, err := c.Do("DEL", settings.RedisPrefix+"url:"+this.Id)
 	if err == nil && reply != "OK" {
@@ -169,11 +174,8 @@ func (this *Url) Delete() error {
 }
 
 func (this *Url) Hit(r *Request) (err error) {
-	c, err := redis.Dial("tcp", settings.RedisUrl)
+	c := pool.Get()
 	defer c.Close()
-	if err != nil {
-		return
-	}
 
 	now := time.Now()
 	year, month, day := now.Date()
@@ -230,11 +232,8 @@ func (this *Url) Hit(r *Request) (err error) {
 }
 
 func (this *Url) Hits() (total int, err error) {
-	c, err := redis.Dial("tcp", settings.RedisUrl)
+	c := pool.Get()
 	defer c.Close()
-	if err != nil {
-		return total, err
-	}
 
 	prefix := settings.RedisPrefix + "stats:" + this.Id + ":hits:"
 	result, err := c.Do("GET", prefix+"total")
@@ -285,11 +284,8 @@ func (this *Url) Sources(sorting bool) (stats SourceStats, err error) {
 }
 
 func (this *Url) Stats(past string) (stats Stats, err error) {
-	c, err := redis.Dial("tcp", settings.RedisUrl)
+	c := pool.Get()
 	defer c.Close()
-	if err != nil {
-		return nil, err
-	}
 
 	now := time.Now()
 	year, month, day := now.Date()
@@ -397,11 +393,8 @@ func (this *Url) Stats(past string) (stats Stats, err error) {
 }
 
 func (this *Url) keyStats(search string, sorting bool) (stats Stats, err error) {
-	c, err := redis.Dial("tcp", settings.RedisUrl)
+	c := pool.Get()
 	defer c.Close()
-	if err != nil {
-		return nil, err
-	}
 
 	values, err := redis.Values(c.Do("KEYS", search))
 	if err != nil {
