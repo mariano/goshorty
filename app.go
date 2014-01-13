@@ -17,6 +17,7 @@ type Settings struct {
 	RedisUrl       string
 	RedisPrefix    string
 	RestrictDomain string
+	Redirect404    string
 	UrlLength      int
 }
 
@@ -85,7 +86,11 @@ func RedirectHandler(resp http.ResponseWriter, req *http.Request) {
 		RenderError(resp, req, err.Error(), http.StatusInternalServerError)
 		return
 	} else if url == nil {
-		RenderError(resp, req, "No URL was found with that goshorty code", http.StatusNotFound)
+		if settings.Redirect404 != "" {
+			http.Redirect(resp, req, settings.Redirect404, http.StatusFound)
+		} else {
+			RenderError(resp, req, "No URL was found with that goshorty code", http.StatusNotFound)
+		}
 		return
 	}
 
@@ -220,6 +225,7 @@ func main() {
 	flag.IntVar(&redisPort, "redis_port", 6379, "Redis port")
 	flag.StringVar(&redisPrefix, "redis_prefix", "goshorty:", "Redis prefix to use")
 	flag.StringVar(&settings.RestrictDomain, "domain", "", "Restrict destination URLs to a single domain")
+	flag.StringVar(&settings.Redirect404, "redirect_404", "", "Restrict destination URLs to a single domain")
 	flag.IntVar(&settings.UrlLength, "length", 5, "How many characters should the short code have")
 	flag.StringVar(&regex, "regex", "[A-Za-z0-9]{%d}", "Regular expression to match route for accessing a short code. %d is replaced with <length> setting")
 	flag.IntVar(&port, "port", 8080, "Port where server is listening on")
