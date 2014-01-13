@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"math"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -48,30 +49,30 @@ func ApiAddHandler(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	url, err := NewUrl(message.LongUrl)
+	gosUrl, err := NewUrl(message.LongUrl)
 	if err != nil {
 		RenderJsonError(resp, req, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	shortUrl, err := router.Get("redirect").URL("id", url.Id)
+	shortUrl, err := router.Get("redirect").URL("id", gosUrl.Id)
 	if err != nil {
 		RenderJsonError(resp, req, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	json := fmt.Sprintf("{\"id\":\"http://%s%s\",\"longUrl\":\"%s\"}", req.Host, shortUrl, url.Destination)
+	json := fmt.Sprintf("{\"id\":\"http://%s%s\",\"longUrl\":\"%s\"}", req.Host, shortUrl, gosUrl.Destination)
 	resp.Write([]byte(json))
 }
 
 func AddHandler(resp http.ResponseWriter, req *http.Request) {
-	url, err := NewUrl(req.FormValue("url"))
+	gosUrl, err := NewUrl(req.FormValue("url"))
 	if err != nil {
 		Render(resp, req, "home", map[string]string{"error": err.Error()})
 		return
 	}
 
-	statsUrl, err := router.Get("stats").URL("id", url.Id)
+	statsUrl, err := router.Get("stats").URL("id", gosUrl.Id)
 	if err != nil {
 		RenderError(resp, req, err.Error(), http.StatusInternalServerError)
 		return
@@ -81,22 +82,28 @@ func AddHandler(resp http.ResponseWriter, req *http.Request) {
 
 func RedirectHandler(resp http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
-	url, err := GetUrl(vars["id"])
+	gosUrl, err := GetUrl(vars["id"])
 	if err != nil {
 		RenderError(resp, req, err.Error(), http.StatusInternalServerError)
 		return
-	} else if url == nil {
+	} else if gosUrl == nil {
 		if settings.Redirect404 != "" {
-			http.Redirect(resp, req, settings.Redirect404, http.StatusFound)
-		} else {
-			RenderError(resp, req, "No URL was found with that goshorty code", http.StatusNotFound)
+			originalUrl, err := router.Get("redirect").URL("id", vars["id"])
+			if err != nil {
+				RenderError(resp, req, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			url404 := strings.Replace(settings.Redirect404, "$gosURL", url.QueryEscape(fmt.Sprintf("http://%s%s", req.Host, originalUrl.String())), 1)
+			http.Redirect(resp, req, url404, http.StatusTemporaryRedirect)
+			return
 		}
+		RenderError(resp, req, "No URL was found with that goshorty code", http.StatusNotFound)
 		return
 	}
 
 	request, _ := requestParser.Parse(req)
-	go url.Hit(request)
-	http.Redirect(resp, req, url.Destination, http.StatusMovedPermanently)
+	go gosUrl.Hit(request)
+	http.Redirect(resp, req, gosUrl.Destination, http.StatusMovedPermanently)
 }
 
 func StatHandler(resp http.ResponseWriter, req *http.Request) {
@@ -113,11 +120,11 @@ func StatHandler(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	url, err := GetUrl(vars["id"])
+	gosUrl, err := GetUrl(vars["id"])
 	if err != nil {
 		RenderError(resp, req, err.Error(), http.StatusInternalServerError)
 		return
-	} else if url == nil {
+	} else if gosUrl == nil {
 		RenderError(resp, req, "No URL was found with that goshorty code", http.StatusNotFound)
 		return
 	}
@@ -126,12 +133,12 @@ func StatHandler(resp http.ResponseWriter, req *http.Request) {
 
 	switch {
 	case vars["what"] == "sources":
-		stats, err := url.Sources(false)
+		stats, err := gosUrl.Sources(false)
 		if err == nil {
 			body, err = json.Marshal(stats)
 		}
 	default:
-		stats, err := url.Stats(vars["what"])
+		stats, err := gosUrl.Stats(vars["what"])
 		if err == nil {
 			body, err = json.Marshal(stats)
 		}
@@ -147,25 +154,25 @@ func StatHandler(resp http.ResponseWriter, req *http.Request) {
 
 func StatsHandler(resp http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
-	url, err := GetUrl(vars["id"])
+	gosUrl, err := GetUrl(vars["id"])
 	if err != nil {
 		RenderError(resp, req, err.Error(), http.StatusInternalServerError)
 		return
-	} else if url == nil {
+	} else if gosUrl == nil {
 		RenderError(resp, req, "No URL was found with that goshorty code", http.StatusNotFound)
 		return
 	}
 
-	hits, err := url.Hits()
+	hits, err := gosUrl.Hits()
 	if err != nil {
 		RenderError(resp, req, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	Render(resp, req, "stats", map[string]string{
-		"id":   url.Id,
-		"url":  url.Destination,
-		"when": relativeTime(time.Now().Sub(url.Created)),
+		"id":   gosUrl.Id,
+		"url":  gosUrl.Destination,
+		"when": relativeTime(time.Now().Sub(gosUrl.Created)),
 		"hits": fmt.Sprintf("%d", hits),
 	})
 }
